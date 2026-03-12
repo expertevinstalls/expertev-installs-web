@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expert EV Installers — Brand Guidelines</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           #030a10;
+    --panel:        #071421;
+    --panel2:       #0b1d2e;
+    --cyan:         #19b8f0;
+    --cyan-bright:  #38d4ff;
+    --cyan-glow:    rgba(25,184,240,0.25);
+    --silver:       #c8d8e8;
+    --white:        #ffffff;
+    --navy:         #0a2540;
+    --steel:        #4a6fa5;
+    --dark-grey:    #1a2535;
+    --mid-grey:     #2e3d50;
+    --orange:       #f47c20;
+    --green:        #22c55e;
+    --dot:          #19b8f0;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid lines background ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(25,184,240,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(25,184,240,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  .page {
+    position:relative; z-index:1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 32px 64px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    margin-bottom: 52px;
+  }
+
+  .brand-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  .brand-title span { color: var(--cyan); }
+
+  .header-logo {
+    text-align:right;
+  }
+  .header-logo .logo-wordmark {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--silver);
+  }
+  .header-logo .logo-wordmark em {
+    font-style: normal;
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--cyan-glow);
+  }
+  .header-logo .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--steel);
+    letter-spacing: 5px;
+    margin-top: 4px;
+  }
+
+  /* corner scan-line accent */
+  .scan-accent {
+    position:absolute; top:0; right:0;
+    width: 200px; height: 200px;
+    background: conic-gradient(from 135deg, transparent 0%, var(--cyan-glow) 30%, transparent 60%);
+    border-radius: 50%;
+    filter: blur(40px);
+    pointer-events:none;
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    display:flex; align-items:center; gap: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .section-label::before {
+    content:'';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan);
+    flex-shrink:0;
+  }
+
+  /* ── GRID ── */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap: 32px; margin-bottom: 40px; }
+  .one-col { margin-bottom: 40px; }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(25,184,240,0.15);
+    border-radius: 8px;
+    padding: 24px;
+    position:relative; overflow:hidden;
+  }
+  .panel::after {
+    content:'';
+    position:absolute; top:0; left:0; right:0; height:1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity:.5;
+  }
+
+  /* ── LOGO DISPLAY ── */
+  .logo-display {
+    display:flex; align-items:center; justify-content:center;
+    height: 140px;
+    position:relative;
+  }
+  .logo-display::before {
+    content:'';
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at center, rgba(25,184,240,0.08) 0%, transparent 70%);
+  }
+  .logo-big {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--silver);
+    letter-spacing: 3px;
+    text-shadow: 0 0 30px rgba(200,216,232,0.2);
+    position:relative;
+  }
+  .logo-big em {
+    font-style:normal;
+    color: var(--cyan);
+    text-shadow: 0 0 30px rgba(25,184,240,0.6);
+  }
+  .logo-caption {
+    text-align:center;
+    font-family:'Share Tech Mono',monospace;
+    font-size: 9px;
+    color: var(--steel);
+    letter-spacing: 4px;
+    text-transform:uppercase;
+    margin-top:8px;
+  }
+  .logo-note {
+    font-size: 10px;
+    color: var(--cyan);
+    letter-spacing: 1px;
+    text-align:center;
+    margin-top:4px;
+    font-family:'Share Tech Mono',monospace;
+  }
+
+  /* ── LOGO VARIATIONS ── */
+  .logo-vars { display:flex; gap:12px; }
+  .logo-var {
+    flex:1; border-radius:6px; height:70px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:6px;
+  }
+  .logo-var.dark { background: #030a10; border: 1px solid rgba(255,255,255,0.1); }
+  .logo-var.light { background: #e8eef4; border:1px solid #ccc; }
+  .logo-var.blue { background: var(--cyan); }
+  .logo-var .lv-text {
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700; font-size:18px; letter-spacing:2px;
+  }
+  .logo-var.dark .lv-text { color:var(--silver); }
+  .logo-var.dark .lv-text em { font-style:normal; color:var(--cyan); }
+  .logo-var.light .lv-text { color:#0a2540; }
+  .logo-var.light .lv-text em { font-style:normal; color:#0e7ab5; }
+  .logo-var.blue .lv-text { color:#000; }
+  .logo-var .lv-label {
+    font-family:'Share Tech Mono',monospace;
+    font-size:8px; letter-spacing:2px; text-transform:uppercase;
+  }
+  .logo-var.dark .lv-label { color: var(--steel); }
+  .logo-var.light .lv-label { color:#666; }
+  .logo-var.blue .lv-label { color:rgba(0,0,0,0.6); }
+
+  /* ── CLEARSPACE ── */
+  .clearspace-wrap {
+    display:flex; gap: 24px; align-items:center;
+  }
+  .clearspace-diagram {
+    position:relative; width:140px; flex-shrink:0; height:90px;
+  }
+  .cs-outer {
+    position:absolute; inset:0;
+    border: 1px dashed rgba(25,184,240,0.4);
+    border-radius:4px;
+  }
+  .cs-inner {
+    position:absolute; inset:16px;
+    border: 1px solid rgba(25,184,240,0.6);
+    border-radius:2px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .cs-logo {
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700; font-size:22px; letter-spacing:2px; color:var(--silver);
+  }
+  .cs-logo em { font-style:normal; color:var(--cyan); }
+  .cs-arrow {
+    position:absolute;
+    font-family:'Share Tech Mono',monospace;
+    font-size:8px; color:var(--cyan);
+  }
+  .cs-arrow.top    { top:-1px;  left:50%; transform:translateX(-50%); }
+  .cs-arrow.bottom { bottom:-1px; left:50%; transform:translateX(-50%); }
+  .cs-arrow.left   { left:-1px; top:50%; transform:translateY(-50%) rotate(-90deg); }
+  .cs-arrow.right  { right:-1px;top:50%; transform:translateY(-50%) rotate(90deg); }
+  .clearspace-text h4 {
+    font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600;
+    color:var(--cyan); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;
+  }
+  .clearspace-text p {
+    font-size:11px; color: #6a8099; line-height:1.6;
+  }
+
+  /* ── PALETTE ── */
+  .palette-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .swatch {
+    display:flex; align-items:center; gap:12px;
+  }
+  .swatch-dot {
+    width:42px; height:42px; border-radius:50%; flex-shrink:0;
+    border:1px solid rgba(255,255,255,0.08);
+  }
+  .swatch-info {}
+  .swatch-name {
+    font-family:'Rajdhani',sans-serif; font-weight:600;
+    font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--white); margin-bottom:2px;
+  }
+  .swatch-codes {
+    font-family:'Share Tech Mono',monospace;
+    font-size:9px; color:var(--steel); line-height:1.7;
+  }
+
+  /* ── TYPOGRAPHY ── */
+  .typo-grid { display:grid; grid-template-columns:80px 1fr; gap:24px; align-items:start; }
+  .typo-specimen {
+    font-size: 64px; font-weight:300; color:var(--white);
+    line-height:1;
+  }
+  .typo-detail {}
+  .typo-name {
+    font-family:'Rajdhani',sans-serif; font-weight:700;
+    font-size:16px; letter-spacing:3px; color:var(--cyan); margin-bottom:2px;
+  }
+  .typo-weight {
+    font-family:'Share Tech Mono',monospace; font-size:9px;
+    color:var(--orange); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px;
+  }
+  .typo-chars {
+    font-size:11px; color:#5a7080; line-height:1.8; letter-spacing:1px;
+  }
+  .type-divider { height:1px; background:rgba(25,184,240,0.1); margin:20px 0; }
+
+  /* ── ICONOGRAPHY ── */
+  .icons-wrap { display:flex; gap:32px; }
+  .icon-group { display:flex; flex-direction:column; gap:12px; }
+  .icon-row { display:flex; gap:10px; }
+  .icon-box {
+    width:40px; height:40px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+  .icon-box.outline {
+    background: transparent;
+    border: 1.5px solid var(--cyan);
+    color: var(--cyan);
+  }
+  .icon-box.filled {
+    background: var(--cyan);
+    border: 1.5px solid var(--cyan);
+    color: #000;
+  }
+  .icon-box.rounded {
+    background: var(--navy);
+    border: 1.5px solid var(--steel);
+    color: var(--cyan);
+    border-radius:12px;
+  }
+  .icon-label {
+    font-family:'Share Tech Mono',monospace; font-size:9px;
+    color:var(--steel); letter-spacing:2px; text-transform:uppercase;
+    margin-top:4px;
+  }
+
+  /* ── BUTTON STYLE ── */
+  .btn-showcase { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .btn-primary {
+    font-family:'Rajdhani',sans-serif; font-weight:600;
+    font-size:13px; letter-spacing:3px; text-transform:uppercase;
+    padding:10px 28px; border-radius:4px;
+    background:transparent;
+    border: 1.5px solid var(--cyan);
+    color: var(--cyan);
+    cursor:pointer;
+    position:relative; overflow:hidden;
+    transition: all .3s ease;
+  }
+  .btn-primary::before {
+    content:''; position:absolute; inset:0;
+    background: linear-gradient(90deg, transparent, rgba(25,184,240,0.12), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2.5s ease infinite;
+  }
+  @keyframes shimmer { to { transform:translateX(100%); } }
+
+  .btn-solid {
+    font-family:'Rajdhani',sans-serif; font-weight:700;
+    font-size:13px; letter-spacing:3px; text-transform:uppercase;
+    padding:10px 28px; border-radius:4px;
+    background: var(--cyan);
+    border: 1.5px solid var(--cyan);
+    color: #000;
+    cursor:pointer;
+  }
+  .btn-orange {
+    font-family:'Rajdhani',sans-serif; font-weight:700;
+    font-size:13px; letter-spacing:3px; text-transform:uppercase;
+    padding:10px 28px; border-radius:4px;
+    background: var(--orange);
+    border: none;
+    color: #fff;
+    cursor:pointer;
+  }
+
+  /* ── GLOW LINES ── */
+  .glow-line {
+    height:1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity:0.2;
+    margin: 40px 0;
+  }
+
+  /* ── PORTAL BUTTON ── */
+  .portal-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 22px;
+    background: #071421;
+    border: 1.5px solid var(--cyan);
+    border-radius: 8px;
+    cursor: pointer; position: relative; overflow: hidden;
+    transition: all 0.25s ease;
+    text-decoration: none;
+    box-shadow: 0 0 12px rgba(25,184,240,0.15), inset 0 0 20px rgba(25,184,240,0.04);
+  }
+  .portal-btn::before {
+    content:''; position:absolute;
+    top:0; left:-100%; width:60%; height:100%;
+    background: linear-gradient(90deg, transparent, rgba(25,184,240,0.1), transparent);
+  }
+  .portal-btn:hover::before { left:160%; transition: left 0.5s ease; }
+  .portal-btn::after {
+    content:''; position:absolute;
+    top:0; left:10%; right:10%; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(25,184,240,0.6), transparent);
+  }
+  .portal-btn:hover {
+    background: #0b1d2e; border-color: #38d4ff;
+    box-shadow: 0 0 24px rgba(25,184,240,0.35), inset 0 0 30px rgba(25,184,240,0.08);
+    transform: translateY(-1px);
+  }
+  .lock-icon {
+    flex-shrink:0; color: #c8a020;
+    filter: drop-shadow(0 0 5px rgba(200,160,32,0.5));
+    transition: filter 0.25s ease;
+  }
+  .portal-btn:hover .lock-icon { filter: drop-shadow(0 0 10px rgba(200,160,32,0.8)); }
+  .portal-label {
+    font-family:'Rajdhani',sans-serif; font-size:17px; font-weight:600;
+    letter-spacing:2px; color: var(--silver); transition: color 0.25s ease;
+  }
+  .portal-btn:hover .portal-label { color: var(--white); }
+  .portal-sm { padding: 8px 16px; border-radius:6px; gap:8px; }
+  .portal-sm .portal-label { font-size:13px; letter-spacing:1.5px; }
+  .portal-lg { padding: 16px 32px; border-radius:10px; gap:14px; }
+  .portal-lg .portal-label { font-size:22px; letter-spacing:3px; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align:center;
+    font-family:'Share Tech Mono',monospace;
+    font-size:10px; color:var(--mid-grey);
+    letter-spacing:3px; margin-top:48px;
+    text-transform:uppercase;
+  }
+  .footer span { color: var(--cyan); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="scan-accent"></div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="brand-title">BRAND<br><span>GUIDELINES</span></div>
+    <div class="header-logo">
+      <div class="logo-wordmark">EXPERT<em>EV</em></div>
+      <div class="logo-sub">INSTALLERS</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Logo + Variations -->
+  <div class="two-col">
+
+    <!-- Company Logo -->
+    <div>
+      <div class="section-label">Company Logo</div>
+      <div class="panel">
+        <div class="logo-display">
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:52px;font-weight:700;color:var(--silver);letter-spacing:3px;text-align:center;text-shadow:0 0 40px rgba(200,216,232,0.15);">
+              EXPERT<em style="font-style:normal;color:var(--cyan);text-shadow:0 0 30px rgba(25,184,240,0.7);">EV</em>
+            </div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:6px;color:var(--steel);text-align:center;margin-top:4px;">INSTALLERS</div>
+          </div>
+        </div>
+        <div class="logo-note">CYAN CUTOUT GLOW | SILVER WORDMARK</div>
+        <div class="logo-caption" style="margin-top:4px;">MAINTAIN CLEARSPACE · NEVER DISTORT</div>
+      </div>
+    </div>
+
+    <!-- Logo Variations -->
+    <div>
+      <div class="section-label">Logo Variations</div>
+      <div class="panel">
+        <div class="logo-vars">
+          <div class="logo-var dark">
+            <div class="lv-text">EXP<em>EV</em></div>
+            <div class="lv-label">Dark BG</div>
+          </div>
+          <div class="logo-var light">
+            <div class="lv-text">EXP<em>EV</em></div>
+            <div class="lv-label">Light BG</div>
+          </div>
+          <div class="logo-var blue">
+            <div class="lv-text" style="color:#000;">EXPEV</div>
+            <div class="lv-label">Cyan BG</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Clearspace + Palette -->
+  <div class="two-col">
+
+    <!-- Clearspace -->
+    <div>
+      <div class="section-label">Logo Clearspace</div>
+      <div class="panel" style="height:100%;">
+        <div class="clearspace-wrap">
+          <div class="clearspace-diagram">
+            <div class="cs-outer"></div>
+            <div class="cs-inner">
+              <div class="cs-logo">E<em>EV</em></div>
+            </div>
+            <div class="cs-arrow top">⌃ X/2</div>
+            <div class="cs-arrow bottom">⌄ X/2</div>
+            <div class="cs-arrow left">X/2</div>
+            <div class="cs-arrow right">X/2</div>
+          </div>
+          <div class="clearspace-text">
+            <h4>Definition</h4>
+            <p>Always reserve half a logo-sized margin on each side of the logo for optimal readability and brand impact across all media.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brand Palette -->
+    <div>
+      <div class="section-label">Brand Palette</div>
+      <div class="panel">
+        <div class="palette-grid">
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#19b8f0;box-shadow:0 0 16px rgba(25,184,240,0.5);"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Cyan Blue</div>
+              <div class="swatch-codes">HEX #19B8F0<br>RGB 25 184 240</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#c8d8e8;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Silver</div>
+              <div class="swatch-codes">HEX #C8D8E8<br>RGB 200 216 232</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#030a10;border:1px solid rgba(255,255,255,0.15);"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Midnight</div>
+              <div class="swatch-codes">HEX #030A10<br>RGB 3 10 16</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#0a2540;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Navy</div>
+              <div class="swatch-codes">HEX #0A2540<br>RGB 10 37 64</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#4a6fa5;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Steel Blue</div>
+              <div class="swatch-codes">HEX #4A6FA5<br>RGB 74 111 165</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#f47c20;box-shadow:0 0 12px rgba(244,124,32,0.3);"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Orange</div>
+              <div class="swatch-codes">HEX #F47C20<br>RGB 244 124 32</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#1a2535;border:1px solid rgba(255,255,255,0.08);"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">Dark Grey</div>
+              <div class="swatch-codes">HEX #1A2535<br>RGB 26 37 53</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-dot" style="background:#ffffff;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">White</div>
+              <div class="swatch-codes">HEX #FFFFFF<br>RGB 255 255 255</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="glow-line"></div>
+
+  <!-- TYPOGRAPHY -->
+  <div class="section-label">Typography</div>
+  <div class="panel one-col">
+    <div class="typo-grid">
+      <div class="typo-specimen" style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--cyan);">Aa</div>
+      <div class="typo-detail">
+        <div class="typo-name">Rajdhani</div>
+        <div class="typo-weight">Bold — Headings & Logo</div>
+        <div class="typo-chars" style="font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:2px;">
+          ABCDEFGHIJKLM<br>NOPQRSTUVWXYZ<br>abcdefghijklm<br>nopqrstuvwxyz
+        </div>
+      </div>
+    </div>
+    <div class="type-divider"></div>
+    <div class="typo-grid">
+      <div class="typo-specimen" style="font-family:'Exo 2',sans-serif;font-weight:300;color:var(--silver);">Aa</div>
+      <div class="typo-detail">
+        <div class="typo-name">Exo 2</div>
+        <div class="typo-weight">Light — Body & UI Text</div>
+        <div class="typo-chars" style="font-family:'Exo 2',sans-serif;font-size:13px;letter-spacing:1px;">
+          ABCDEFGHIJKLM<br>NOPQRSTUVWXYZ<br>abcdefghijklm<br>nopqrstuvwxyz
+        </div>
+      </div>
+    </div>
+    <div class="type-divider"></div>
+    <div class="typo-grid">
+      <div class="typo-specimen" style="font-family:'Share Tech Mono',monospace;font-size:40px;color:var(--steel);">01</div>
+      <div class="typo-detail">
+        <div class="typo-name">Share Tech Mono</div>
+        <div class="typo-weight">Regular — Labels & Codes</div>
+        <div class="typo-chars" style="font-family:'Share Tech Mono',monospace;font-size:12px;">
+          ABCDEFGHIJKLM<br>NOPQRSTUVWXYZ<br>0123456789
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="glow-line"></div>
+
+  <!-- Iconography + Buttons -->
+  <div class="two-col">
+
+    <!-- Iconography -->
+    <div>
+      <div class="section-label">Iconography Style</div>
+      <div class="panel">
+        <div class="icons-wrap">
+
+          <!-- OUTLINE GROUP -->
+          <div class="icon-group">
+            <div class="icon-row">
+              <!-- Lightning bolt -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <!-- Plug / charge -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H3m16 0h-2M7 7l-2-2m14 2-2-2M7 17l-2 2m14-2 2 2"/><circle cx="12" cy="12" r="4"/></svg>
+              </div>
+              <!-- Car -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><rect x="6" y="15" width="12" height="4" rx="2"/><path d="M5 9l2-4h10l2 4"/></svg>
+              </div>
+            </div>
+            <div class="icon-row">
+              <!-- Gear / settings -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <!-- Location pin -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <!-- Check -->
+              <div class="icon-box outline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+            <div class="icon-label">Outline</div>
+          </div>
+
+          <!-- FILLED GROUP -->
+          <div class="icon-group">
+            <div class="icon-row">
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12H3m16 0h-2M7 7l-2-2m14 2-2-2M7 17l-2 2m14-2 2 2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+              </div>
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><rect x="6" y="15" width="12" height="4" rx="2"/><path d="M5 9l2-4h10l2 4"/></svg>
+              </div>
+            </div>
+            <div class="icon-row">
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="#000"/></svg>
+              </div>
+              <div class="icon-box filled">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+            <div class="icon-label">Filled</div>
+          </div>
+
+          <!-- ROUNDED GROUP -->
+          <div class="icon-group">
+            <div class="icon-row">
+              <div class="icon-box rounded">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="icon-box rounded">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12H3m16 0h-2M7 7l-2-2m14 2-2-2M7 17l-2 2m14-2 2 2"/><circle cx="12" cy="12" r="4"/></svg>
+              </div>
+            </div>
+            <div class="icon-row">
+              <div class="icon-box rounded">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><rect x="6" y="15" width="12" height="4" rx="2"/><path d="M5 9l2-4h10l2 4"/></svg>
+              </div>
+              <div class="icon-box rounded">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+            </div>
+            <div class="icon-label">Rounded</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Button Style -->
+    <div>
+      <div class="section-label">Button Style</div>
+      <div class="panel" style="display:flex;flex-direction:column;gap:14px;">
+
+        <!-- Primary -->
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;margin-bottom:7px;">Primary — Outline</div>
+          <button class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Get A Quote
+          </button>
+        </div>
+
+        <!-- Secondary -->
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;margin-bottom:7px;">Secondary — Filled</div>
+          <button class="btn-solid" style="display:inline-flex;align-items:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            Book Now
+          </button>
+        </div>
+
+        <!-- CTA -->
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;margin-bottom:7px;">CTA — High Emphasis</div>
+          <button class="btn-orange" style="display:inline-flex;align-items:center;gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><rect x="6" y="15" width="12" height="4" rx="2"/><path d="M5 9l2-4h10l2 4"/></svg>
+            Schedule Install
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="glow-line"></div>
+
+  <!-- Portal Button -->
+  <div class="section-label">Portal Button</div>
+  <div class="panel one-col">
+    <div style="display:flex;gap:40px;align-items:flex-end;flex-wrap:wrap;">
+
+      <!-- Small -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;">Small</div>
+        <a class="portal-btn portal-sm" href="#">
+          <span class="lock-icon">
+            <svg width="13" height="15" viewBox="0 0 18 20" fill="none">
+              <rect x="2" y="9" width="14" height="10" rx="2.5" fill="currentColor" opacity="0.95"/>
+              <path d="M5 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <circle cx="9" cy="14" r="1.5" fill="#071421"/><line x1="9" y1="15.5" x2="9" y2="17" stroke="#071421" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="portal-label">Portal</span>
+        </a>
+      </div>
+
+      <!-- Default -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;">Default</div>
+        <a class="portal-btn" href="#">
+          <span class="lock-icon">
+            <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
+              <rect x="2" y="9" width="14" height="10" rx="2.5" fill="currentColor" opacity="0.95"/>
+              <path d="M5 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <circle cx="9" cy="14" r="1.5" fill="#071421"/><line x1="9" y1="15.5" x2="9" y2="17" stroke="#071421" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="portal-label">Portal</span>
+        </a>
+      </div>
+
+      <!-- Large -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--steel);letter-spacing:3px;text-transform:uppercase;">Large</div>
+        <a class="portal-btn portal-lg" href="#">
+          <span class="lock-icon">
+            <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
+              <rect x="2" y="13" width="20" height="13" rx="3" fill="currentColor" opacity="0.95"/>
+              <path d="M6 13V9a6 6 0 0 1 12 0v4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+              <circle cx="12" cy="20" r="2" fill="#071421"/><line x1="12" y1="22" x2="12" y2="24" stroke="#071421" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="portal-label">Portal</span>
+        </a>
+      </div>
+
+      <!-- Spec notes -->
+      <div style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--steel);letter-spacing:2px;line-height:2.2;text-transform:uppercase;">
+        ICON → GOLD LOCK · #C8A020<br>
+        BORDER → CYAN · #19B8F0<br>
+        BG → MIDNIGHT NAVY · #071421<br>
+        LABEL → SILVER · RAJDHANI 600<br>
+        HOVER → CYAN GLOW + SHIMMER
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>EXPERT EV INSTALLERS</span> &nbsp;·&nbsp; BRAND GUIDELINES &nbsp;·&nbsp; CONFIDENTIAL &nbsp;·&nbsp; 2026
+  </div>
+
+</div>
+</body>
+</html>

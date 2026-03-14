@@ -186,7 +186,7 @@ function buildCounty(c, id) {
             <div class="form-note">Free · No obligation · ${c.state}-licensed electrician calls you</div>
           </div>
           <div class="form-fields" id="cpff-${id}">
-            <input type="hidden" name="county_page" value="${c.name}">
+            <input type="hidden" name="county" value="${c.name}">
             <div class="ff-row">
               <div class="ff"><label>First Name</label><input type="text" name="first_name" placeholder="John"></div>
               <div class="ff"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith"></div>
@@ -527,11 +527,21 @@ function runPanelAnalysis(leadId) {
   }, 2800);
 }
 
+/**
+ * Returns the live contractors array.
+ * Prefers dbContractors (loaded from Supabase) with a fallback to the
+ * _getContractors() demo array so the app works offline / before Supabase loads.
+ */
+function _getContractors() {
+  // Supabase is the single source of truth. Never fall back to demo CONTRACTORS.
+  // Returns [] before load completes; _loadDbContractors() calls buildPages() when done.
+  return dbContractors;
+}
+
 /* ── Auto Territory Assignment (round-robin) ── */
-let _rrIndex = {};
 function autoAssignByCounty(county, state) {
   if (!settings.autoAssign) return null;
-  const eligible = CONTRACTORS.filter(c => c.counties.includes(county) && c.status === 'active');
+  const eligible = _getContractors().filter(c => c.counties.includes(county) && c.status === 'active');
   if (!eligible.length) return null;
   const key = county;
   _rrIndex[key] = (_rrIndex[key] || 0) % eligible.length;
@@ -541,9 +551,10 @@ function autoAssignByCounty(county, state) {
 }
 
 function submitForm(fieldsId, successId) {
+  console.log('[FORM] submitForm called | fieldsId:', fieldsId, '| Supabase ready:', isSupabaseReady(), '| adminEmail:', settings.adminEmail);
   const f = document.getElementById(fieldsId);
   const s = document.getElementById(successId);
-  if (!f) return;
+  if (!f) { console.error('[FORM] form element not found for id:', fieldsId); return; }
 
   /* ── 1. HONEYPOT: bots fill hidden fields, humans don't ── */
   const honeypot = f.querySelector('[name="website"]');
@@ -553,7 +564,24 @@ function submitForm(fieldsId, successId) {
   const inputs = f.querySelectorAll('input:not([name="website"]), select, textarea');
   const data   = new FormData();
   const vals   = {};
-  inputs.forEach(el => { if (el.name) { data.append(el.name, el.value); vals[el.name] = el.value; } });
+  inputs.forEach(el => {
+    if (!el.name) return;
+    if (el.type === 'file') {
+      // Formspree free tier returns 422 for real file attachments sent via AJAX.
+      // Instead: if a file was selected, send its filename as a plain text field
+      // (shows up in Formspree email as "panel_photo_name: IMG_1234.jpg").
+      // Actual file storage will be handled via Supabase in a later phase.
+      if (el.files && el.files.length > 0) {
+        const fname = el.files[0].name;
+        data.append(el.name + '_name', fname); // text field, not a file — Formspree accepts this
+        vals[el.name] = fname;                 // store filename in lead for reference
+      }
+      // No file selected → skip entirely
+    } else {
+      data.append(el.name, el.value);
+      vals[el.name] = el.value;
+    }
+  });
 
   /* ── 3. Required field validation ── */
   const requiredFields = [
@@ -602,6 +630,7 @@ function submitForm(fieldsId, successId) {
 
   /* ── 8. Disable button, show loading state ── */
   const btn = f.querySelector('.form-submit-btn') || f.parentElement.querySelector('.form-submit-btn');
+  const btnOrigText = btn ? btn.textContent : '⚡ Get My Free Quote';
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
   /* ── 9. Score lead complexity & estimate value ── */
@@ -616,86 +645,119 @@ function submitForm(fieldsId, successId) {
   const stateRaw   = vals['county'] && vals['county'].includes('NJ') ? 'NJ' : 'PA';
   const assignedId = autoAssignByCounty(countyRaw, stateRaw);
 
-  /* ── 11. POST to Formspree ── */
-  fetch('https://formspree.io/f/' + settings.formspreeId, {
-    method: 'POST', body: data, headers: { 'Accept': 'application/json' }
-  })
-  .then(r => {
-    if (r.ok) {
-      f.style.display = 'none';
-      if (s) s.classList.add('show');
+  /* ── 11. Build lead object and save to system FIRST ── */
+  const newId  = 'L' + String(Date.now()).slice(-6);
+  const now    = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const fullName = sanitizeHTML(`${vals['first_name']||''} ${vals['last_name']||''}`.trim() || 'New Lead');
+  const initialNotes = [];
+  if (assignedId) initialNotes.push({ author:'System', text:'Auto-assigned via territory routing (round-robin).', time:'Just now' });
+  if ((vals['notes'] || '').trim()) initialNotes.push({ author:'Customer', text: sanitizeHTML(vals['notes']), time:'On submission' });
 
-      /* ── 12. Build lead object & inject into system ── */
-      const newId  = 'L' + String(Date.now()).slice(-6);
-      const now    = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-      const fullName = sanitizeHTML(`${vals['first_name']||''} ${vals['last_name']||''}`.trim() || 'New Lead');
-      const lead   = {
-        id:              newId,
-        _ts:             Date.now(),   // internal timestamp for duplicate/rate logic
-        name:            fullName,
-        phone:           sanitizeHTML(vals['phone']  || ''),
-        email:           sanitizeHTML(vals['email']  || ''),
-        address:         '', city: '',
-        county:          sanitizeHTML(countyRaw),
-        state:           sanitizeHTML(stateRaw),
-        service:         'Level 2 Home Charger',
-        panel:           panelSize === '200amp' ? '200A' : panelSize === '150amp' ? '150A' : panelSize === '100amp' ? '100A' : 'TBD',
-        charger:         vals['charger_brand'] || 'TBD',
-        rebate:          stateRaw === 'NJ' ? 'PSE&G $250' : 'PECO $250',
-        status:          assignedId ? 'assigned' : 'new',
-        contractor:      assignedId || null,
-        created:         now,
-        value:           valEst.mid,
-        notes:           assignedId ? [{ author:'System', text:'Auto-assigned via territory routing (round-robin).', time:'Just now' }] : [],
-        priority:        complexity === 'Commercial Install' ? 'high' : 'normal',
-        complexity,      panelSize,     distance,
-        installLocation: vals['install_location'] || '',
-        chargerBrand:    vals['charger_brand']     || '',
-        leadSource:      vals['lead_source']        || 'Direct',
-        contactedAt:     null,
-        review:          null,
-        isDuplicate:     false,
-      };
+  const lead = {
+    id:              newId,
+    _ts:             Date.now(),
+    name:            fullName,
+    phone:           sanitizeHTML(vals['phone']  || ''),
+    email:           sanitizeHTML(vals['email']  || ''),
+    address:         sanitizeHTML(vals['address'] || ''), city: '',
+    county:          sanitizeHTML(countyRaw),
+    state:           sanitizeHTML(stateRaw),
+    service:         'Level 2 Home Charger',
+    panel:           panelSize === '200amp' ? '200A' : panelSize === '150amp' ? '150A' : panelSize === '100amp' ? '100A' : 'TBD',
+    charger:         vals['charger_brand'] || vals['ev_vehicle'] || 'TBD',
+    rebate:          stateRaw === 'NJ' ? 'PSE&G $250' : 'PECO $250',
+    status:          assignedId ? 'assigned' : 'new',
+    contractor:      assignedId || null,
+    created:         now,
+    value:           valEst.mid,
+    notes:           initialNotes,
+    priority:        complexity === 'Commercial Install' ? 'high' : 'normal',
+    complexity,      panelSize,     distance,
+    installLocation: vals['install_location'] || vals['charger_location'] || '',
+    chargerBrand:    vals['charger_brand']    || '',
+    leadSource:      vals['lead_source']       || 'Direct',
+    contactedAt:     null,
+    review:          null,
+    isDuplicate:     false,
+  };
 
-      /* Enrich with job intelligence */
-      const ji         = getJobIntelligence(lead);
-      lead.installTime     = ji.timeLabel;
-      lead.profitPotential = ji.profit;
-      lead.difficulty      = ji.difficulty;
+  /* Enrich with job intelligence */
+  const ji = getJobIntelligence(lead);
+  lead.installTime     = ji.timeLabel;
+  lead.profitPotential = ji.profit;
+  lead.difficulty      = ji.difficulty;
 
-      leads.unshift(lead);
-      persist(); // ← write to localStorage immediately
+  /* Save to localStorage first — lead is captured locally regardless of DB outcome */
+  leads.unshift(lead);
+  persist();
 
-      if (typeof buildSidebar === 'function') buildSidebar();
-      if (typeof addNotification === 'function') {
-        const contractor = assignedId ? CONTRACTORS.find(c => c.id === assignedId) : null;
-        addNotification(
-          `<strong>New lead — ${sanitizeHTML(fullName)}</strong><br>` +
-          `${sanitizeHTML(countyRaw)} · ${sanitizeHTML(complexity)} · ` +
-          `Est. $${valEst.min.toLocaleString()}–$${valEst.max.toLocaleString()}` +
-          (contractor ? `<br>Auto-assigned → ${sanitizeHTML(contractor.name)}` : '')
-        );
-        persist();
-      }
-
-      /* Follow-up alert: fire after 10 minutes if lead still uncontacted */
-      setTimeout(() => {
-        const l = leads.find(x => x.id === newId);
-        if (l && !l.contactedAt && !['completed','lost'].includes(l.status)) {
-          addNotification(`⚠️ <strong>Follow-up:</strong> ${sanitizeHTML(fullName)} has not been contacted yet (10 min).`);
-          persist();
+  /* Push to Supabase. Public forms run as anon — the anon_leads_insert RLS policy
+     must allow the insert. If it fails, the lead is preserved in localStorage but
+     will NOT appear in the admin dashboard until schema_v3_rls_fix.sql is applied. */
+  const _formSource = fieldsId === 'main-form-fields' ? 'main_form' : 'county_form';
+  if (isSupabaseReady()) {
+    console.log('[SUPABASE] Attempting lead insert | source:', _formSource, '| lead_id:', newId,
+      '| status:', lead.status, '| contractor:', lead.contractor ?? 'null',
+      '| notes_count:', lead.notes.length);
+    sbCreateLead(lead)
+      .then(r => {
+        if (!r) {
+          console.error('[LEADS] INSERT FAILED | source:', _formSource, '| lead_id:', newId,
+            '| result: createLead returned null',
+            '| action: check [SUPABASE] logs above for error details',
+            '| fix: ensure schema_v3_rls_fix.sql has been run in Supabase SQL Editor');
+        } else {
+          console.log('[LEADS] INSERT OK | source:', _formSource, '| lead_id:', newId,
+            '| lead will appear in admin dashboard on next hydration or realtime event');
         }
-      }, 10 * 60 * 1000);
+      })
+      .catch(e => console.error('[LEADS] INSERT THREW | source:', _formSource, '| lead_id:', newId, '| error:', e.message));
+  } else {
+    console.warn('[SUPABASE] not ready — lead saved to localStorage only | lead_id:', newId,
+      '| Supabase key/URL may be incorrect, or CDN failed to load');
+  }
 
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = '⚡ Get My Free Quote'; }
-      showToast('Submission failed — please call us directly or try again');
+  /* Show success — lead is captured */
+  f.style.display = 'none';
+  if (s) s.classList.add('show');
+
+  if (typeof buildSidebar === 'function') buildSidebar();
+  if (typeof addNotification === 'function') {
+    const contractor = assignedId ? _getContractors().find(c => c.id === assignedId) : null;
+    addNotification(
+      `<strong>New lead — ${sanitizeHTML(fullName)}</strong><br>` +
+      `${sanitizeHTML(countyRaw)} · ${sanitizeHTML(complexity)} · ` +
+      `Est. $${valEst.min.toLocaleString()}–$${valEst.max.toLocaleString()}` +
+      (contractor ? `<br>Auto-assigned → ${sanitizeHTML(contractor.name)}` : '')
+    );
+    persist();
+  }
+
+  /* Follow-up alert: fire after 10 minutes if lead still uncontacted */
+  setTimeout(() => {
+    const l = leads.find(x => x.id === newId);
+    if (l && !l.contactedAt && !['completed','lost'].includes(l.status)) {
+      addNotification(`⚠️ <strong>Follow-up:</strong> ${sanitizeHTML(fullName)} has not been contacted yet (10 min).`);
+      persist();
     }
-  })
-  .catch(() => {
-    if (btn) { btn.disabled = false; btn.textContent = '⚡ Get My Free Quote'; }
-    showToast('Network error — please call us or try again shortly');
-  });
+  }, 10 * 60 * 1000);
+
+  /* ── 12. POST to Formspree in background for email notification ── */
+  /* Lead is already saved — Formspree failure does NOT lose the lead  */
+  if (settings.formspreeId) {
+    console.log('[FORMSPREE] Sending notification | formspreeId:', settings.formspreeId, '| lead_id:', newId);
+    fetch('https://formspree.io/f/' + settings.formspreeId, {
+      method: 'POST', body: data, headers: { 'Accept': 'application/json' }
+    }).then(r => {
+      if (r.ok) {
+        console.log('[FORMSPREE] Email notification sent ✓ | status:', r.status);
+      } else {
+        r.text().then(body => console.warn('[FORMSPREE] Notification failed | status:', r.status, '| body:', body));
+      }
+    }).catch(err => console.warn('[FORMSPREE] Fetch error (non-blocking):', err.message));
+  } else {
+    console.log('[FORMSPREE] No formspreeId configured — email notification skipped');
+  }
 }
 
 function focusForm() {
@@ -706,10 +768,6 @@ function focusForm() {
   }, 80);
 }
 
-function sid(id) {
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
-}
 
 /* Navbar scroll */
 window.addEventListener('scroll', () => {
@@ -732,62 +790,6 @@ function closeMobile() { document.getElementById('mobile-nav').classList.remove(
 
 
 
-// ═══════════════════════════════════════════════════════════════
-// DATA
-// ═══════════════════════════════════════════════════════════════
-const USERS = {
-  'admin@expertev.com':   { password:'admin123',    role:'admin',      name:'Sarah Mitchell' },
-  'redflow@expertev.com': { password:'redflow123',  role:'contractor', name:'Red Flow Electric', id:'c1' }
-};
-
-const CONTRACTORS = [
-  { id:'c1', name:'Red Flow Electric', contact:'James Harrington', phone:'(215) 555-0192', email:'james@redflowelectric.com', license:'PA-EL-48291', counties:['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'], leads:24, completed:18, revenue:19800, rating:4.9, status:'active' },
-  { id:'c2', name:'Volt Masters LLC',  contact:'Angela Rivera',    phone:'(856) 555-0144', email:'angela@voltmasters.com',   license:'NJ-EL-77341', counties:['Burlington','Camden','Gloucester'],                                                          leads:11, completed:7,  revenue:8400,  rating:4.7, status:'active' },
-];
-
-let leads = [
-  { id:'L001', name:'Marcus Thompson',  phone:'(215) 555-2301', email:'m.thompson@gmail.com',  address:'4821 Spruce St',        city:'Philadelphia', county:'Philadelphia', state:'PA', service:'Level 2 Home Charger',           panel:'200A',       charger:'ChargePoint Home Flex',   rebate:'PECO $250',  status:'new',        contractor:null, created:'Mar 10, 2026', value:1200, notes:[], priority:'normal', complexity:'Basic Installation',    panelSize:'200amp', distance:'10to25',  installLocation:'garage',      chargerBrand:'chargepoint',    leadSource:'Google Ads',   contactedAt:null, review:null },
-  { id:'L002', name:'Jennifer Walsh',   phone:'(610) 555-8844', email:'jwalsh@outlook.com',    address:'220 Valley Rd',         city:'West Chester', county:'Chester',      state:'PA', service:'Level 2 Home Charger',           panel:'200A',       charger:'Tesla Wall Connector',    rebate:'PECO $250',  status:'assigned',   contractor:'c1', created:'Mar 9, 2026',  value:1350, notes:[{author:'Admin',text:'Customer has Tesla Model Y. Confirm Gen 3 Wall Connector compatible.',time:'Mar 9'}], priority:'normal', complexity:'Basic Installation',    panelSize:'200amp', distance:'under10', installLocation:'garage',      chargerBrand:'tesla',          leadSource:'SEO',          contactedAt:'Mar 9, 2026',  review:null },
-  { id:'L003', name:'David Kim',        phone:'(215) 555-9012', email:'davidkim@email.com',    address:'18 Mill Creek Rd',      city:'Doylestown',   county:'Bucks',       state:'PA', service:'Level 2 + Smart Panel Upgrade',  panel:'100A→200A',  charger:'Grizzl-E Level 2',        rebate:'PECO $250',  status:'completed',  contractor:'c1', created:'Mar 7, 2026',  value:2100, notes:[{author:'Red Flow',text:'Panel upgrade completed. Permit pulled 3/8, inspection passed 3/9.',time:'Mar 9'}], priority:'normal', complexity:'Panel Upgrade Likely',  panelSize:'100amp', distance:'25to50',  installLocation:'basement',    chargerBrand:'not_purchased',  leadSource:'SEO',          contactedAt:'Mar 7, 2026',  review:{rating:5,text:'Excellent work, very professional.',date:'Mar 12'} },
-  { id:'L004', name:'Rosa Martinez',    phone:'(856) 555-4422', email:'rosa.m@gmail.com',      address:'95 Lakeview Dr',        city:'Marlton',      county:'Burlington',  state:'NJ', service:'Commercial Fleet Charger',       panel:'400A 3-phase',charger:'Eaton Level 2 (x4)',      rebate:'PSE&G $500', status:'quote-sent', contractor:'c1', created:'Mar 8, 2026',  value:8500, notes:[{author:'Admin',text:'4-port commercial install. Fleet of 4 Rivian vans. Loading dock access only.',time:'Mar 8'}], priority:'high',   complexity:'Commercial Install',    panelSize:'200amp', distance:'over50',  installLocation:'outside_wall',chargerBrand:'not_purchased',  leadSource:'Facebook Ads', contactedAt:'Mar 8, 2026',  review:null },
-  { id:'L005', name:"Brian O'Connor",   phone:'(610) 555-7733', email:'boconnor@work.net',     address:'55 Valley Ave',         city:'Wayne',        county:'Delaware',    state:'PA', service:'Level 2 Home Charger',           panel:'200A',       charger:'Enel X JuiceBox',         rebate:'PECO $250',  status:'contacted',  contractor:'c1', created:'Mar 9, 2026',  value:1150, notes:[{author:'Red Flow',text:'Spoke by phone. Wants install before April 1.',time:'Mar 9'}], priority:'normal', complexity:'Basic Installation',    panelSize:'200amp', distance:'under10', installLocation:'garage',      chargerBrand:'juicebox',       leadSource:'Direct',       contactedAt:'Mar 9, 2026',  review:null },
-  { id:'L006', name:'Allison Cho',      phone:'(215) 555-6601', email:'a.cho@gmail.com',       address:'302 W Rittenhouse Sq',  city:'Philadelphia', county:'Philadelphia',state:'PA', service:'Level 2 Condo Install',          panel:'150A',       charger:'ChargePoint Home Flex',   rebate:'PECO $250',  status:'scheduled',  contractor:'c1', created:'Mar 10, 2026', value:1450, notes:[{author:'Admin',text:'Condo board approval secured. Install confirmed April 2nd, 9am.',time:'Mar 10'}], priority:'normal', complexity:'Basic Installation',    panelSize:'150amp', distance:'10to25',  installLocation:'utility_room',chargerBrand:'chargepoint',    leadSource:'Google Ads',   contactedAt:'Mar 10, 2026', review:null },
-  { id:'L007', name:'Robert Flores',    phone:'(856) 555-2277', email:'rflores@nj.net',        address:'14 Cedar Rd',           city:'Voorhees',     county:'Camden',      state:'NJ', service:'Level 2 Home Charger',           panel:'200A',       charger:'Tesla Wall Connector',    rebate:'PSE&G $250', status:'new',        contractor:null, created:'Mar 10, 2026', value:1300, notes:[], priority:'normal', complexity:'Basic Installation',    panelSize:'200amp', distance:'under10', installLocation:'garage',      chargerBrand:'tesla',          leadSource:'Google Ads',   contactedAt:null, review:null },
-  { id:'L008', name:'Priya Patel',      phone:'(610) 555-1199', email:'priya.p@email.com',     address:'77 E Lancaster Ave',    city:'Ardmore',      county:'Montgomery',  state:'PA', service:'Level 2 Home Charger + Outlet',  panel:'200A',       charger:'Grizzl-E',                rebate:'PECO $250',  status:'new',        contractor:null, created:'Mar 10, 2026', value:1100, notes:[], priority:'normal', complexity:'Basic Installation',    panelSize:'200amp', distance:'10to25',  installLocation:'driveway',    chargerBrand:'not_purchased',  leadSource:'SEO',          contactedAt:null, review:null },
-  { id:'L009', name:'Tom Bradley',      phone:'(856) 555-8801', email:'tom.b@gmail.com',       address:'201 Deptford Rd',       city:'Sewell',       county:'Gloucester',  state:'NJ', service:'Level 2 Home Charger',           panel:'200A',       charger:'Enel X JuiceBox',         rebate:'PSE&G $250', status:'lost',       contractor:'c2', created:'Mar 5, 2026',  value:1200, notes:[{author:'Admin',text:'Customer went with another provider. Price was the issue.',time:'Mar 7'}], priority:'normal', complexity:'Long Wiring Run',       panelSize:'200amp', distance:'over50',  installLocation:'outside_wall',chargerBrand:'juicebox',       leadSource:'Facebook Ads', contactedAt:null, review:null },
-];
-
-let notifications = [
-  { id:1, text:'<strong>New lead — Marcus Thompson</strong><br>Philadelphia · Level 2 Home Charger', time:'2 min ago', read:false },
-  { id:2, text:'<strong>Allison Cho</strong> scheduled for April 2nd installation', time:'18 min ago', read:false },
-  { id:3, text:'<strong>David Kim</strong> job completed by Red Flow Electric — $2,100', time:'1 hr ago', read:true },
-  { id:4, text:'<strong>Rosa Martinez</strong> — commercial fleet inquiry, Burlington NJ', time:'3 hrs ago', read:true },
-];
-
-let settings = {
-  formspreeId: 'xykneqwo',
-  adminEmail: 'admin@expertev.com',
-  paPhone: '(215) 555-0199',
-  njPhone: '(856) 555-0199',
-  leadFee: 75,
-  commissionPct: 15,
-  emailAlerts: true,
-  smsAlerts: false,
-  autoAssign: false,
-  checklistDone: {}
-};
-
-let checklist = [
-  { id:'domain',    title:'Register your domain',            desc:'Buy expertevinstallers.com (or similar) on Namecheap or GoDaddy (~$12/yr). This is your brand URL.',           link:'https://www.namecheap.com', linkText:'Open Namecheap' },
-  { id:'netlify',   title:'Deploy website to Netlify',       desc:'Upload expertev-credibility-first.html and this dashboard.html to Netlify. Free plan works great to start.',   link:'https://app.netlify.com',  linkText:'Open Netlify' },
-  { id:'formspree', title:'Connect Formspree for lead forms', desc:'Create a free Formspree account, get your form ID, and paste it into Settings → Integrations below.',         link:'https://formspree.io',     linkText:'Open Formspree' },
-  { id:'email',     title:'Set up admin email alerts',        desc:'In Settings → Notifications, enter your real email so new leads hit your inbox instantly.',                    link:null },
-  { id:'redflow',   title:'Confirm Red Flow Electric partnership', desc:'Have a formal conversation with Red Flow ownership to get permission to use their name in marketing.',   link:null },
-  { id:'phone',     title:'Replace placeholder phone numbers', desc:'Update the PA and NJ phone numbers in Settings → Business Info. Use a Google Voice number or real line.',   link:null },
-  { id:'rebates',   title:'Verify current rebate amounts',    desc:'PECO and PSE&G rebate amounts change. Confirm current amounts at their websites before going live.',           link:'https://www.peco.com/MyAccount/MySavings/Pages/ElectricVehicles.aspx', linkText:'PECO EV Rebates' },
-  { id:'firstlead', title:'Get your first real lead',         desc:'Share the website link on Facebook, Nextdoor, and with Red Flow\'s existing customers to get lead #1.',        link:null },
-];
-
 /* Enrich existing leads with job intelligence fields if missing */
 leads.forEach(l => {
   if (!l.installTime || !l.profitPotential) {
@@ -798,8 +800,6 @@ leads.forEach(l => {
   }
 });
 
-let currentUser = null;
-let notifOpen = false;
 
 // ═══════════════════════════════════════════════════════════════
 // PERSISTENCE ENGINE — localStorage bridge
@@ -807,12 +807,6 @@ let notifOpen = false;
 // On a real production deployment, replace persist() and
 // _loadPersisted() with Supabase API calls (schema below in docs).
 // ═══════════════════════════════════════════════════════════════
-const _STORE = {
-  leads:    'eev_v1_leads',
-  notifs:   'eev_v1_notifs',
-  settings: 'eev_v1_settings',
-  checklist:'eev_v1_checklist',
-};
 
 function persist() {
   try {
@@ -823,6 +817,7 @@ function persist() {
 }
 
 (function _loadPersisted() {
+  console.log('[VERSION] build=forensic-fix-2026-03-14-v1');
   try {
     const sl = localStorage.getItem(_STORE.leads);
     if (sl) {
@@ -835,8 +830,24 @@ function persist() {
       if (Array.isArray(p)) notifications.splice(0, notifications.length, ...p);
     }
     const ss = localStorage.getItem(_STORE.settings);
-    if (ss) Object.assign(settings, JSON.parse(ss));
+    if (ss) {
+      const keyBefore = settings.googleMapsKey; // preserve non-empty default
+      Object.assign(settings, JSON.parse(ss));
+      if (!settings.googleMapsKey && keyBefore) settings.googleMapsKey = keyBefore;
+    }
   } catch(e) { console.warn('[EEV] Could not restore persisted data:', e.message); }
+
+  // ── Stale adminEmail guard ──────────────────────────────────────
+  // Old sessions may have stored the wrong admin email. Force-correct it so
+  // _resolveAuthUser() routes admin logins correctly.
+  const CORRECT_ADMIN_EMAIL = 'expertevinstalls@gmail.com';
+  if (!settings.adminEmail || settings.adminEmail.toLowerCase() === 'evinstalls@gmail.com') {
+    console.warn('[AUTH] Stale or missing adminEmail detected in localStorage:', JSON.stringify(settings.adminEmail),
+      '— resetting to', CORRECT_ADMIN_EMAIL);
+    settings.adminEmail = CORRECT_ADMIN_EMAIL;
+  }
+
+  console.log('[AUTH] settings.adminEmail after restore:', settings.adminEmail);
   /* Re-enrich any leads that may be missing intel fields after restore */
   leads.forEach(l => {
     if (!l.installTime || !l.profitPotential) {
@@ -848,21 +859,6 @@ function persist() {
   });
 })();
 
-// ═══════════════════════════════════════════════════════════════
-// SECURITY — Inline HTML sanitizer (XSS prevention)
-// Escapes all user-supplied strings before innerHTML injection.
-// For production also load DOMPurify via CDN as a second layer.
-// ═══════════════════════════════════════════════════════════════
-function sanitizeHTML(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g,  '&amp;')
-    .replace(/</g,  '&lt;')
-    .replace(/>/g,  '&gt;')
-    .replace(/"/g,  '&quot;')
-    .replace(/'/g,  '&#x27;')
-    .replace(/\//g, '&#x2F;');
-}
 
 // ═══════════════════════════════════════════════════════════════
 // SPAM PROTECTION
@@ -871,21 +867,7 @@ function sanitizeHTML(str) {
 // 3. Duplicate detection (same phone/email within 10 minutes)
 // 4. Phone format validation (US 10-digit)
 // ═══════════════════════════════════════════════════════════════
-const _RATE_KEY = 'eev_v1_rate';
-const _RATE_WIN = 10 * 60 * 1000; // 10 minutes
-const _RATE_MAX = 3;
 
-function _checkRateLimit() {
-  try {
-    const now  = Date.now();
-    const hist = JSON.parse(localStorage.getItem(_RATE_KEY) || '[]');
-    const recent = hist.filter(t => now - t < _RATE_WIN);
-    if (recent.length >= _RATE_MAX) return false;
-    recent.push(now);
-    localStorage.setItem(_RATE_KEY, JSON.stringify(recent));
-    return true;
-  } catch(e) { return true; } // fail open on storage errors
-}
 
 function _isDuplicate(phone, email) {
   const cutoff = Date.now() - _RATE_WIN;
@@ -900,58 +882,506 @@ function _isDuplicate(phone, email) {
   });
 }
 
-function _validatePhone(raw) {
-  const cleaned = (raw || '').replace(/[\s\-\(\)\.\+ext]/gi, '');
-  return /^1?\d{10}$/.test(cleaned);
-}
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
-function fillDemo(role) {
-  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
-  if (role === 'admin') {
-    document.getElementById('login-email').value = 'admin@expertev.com';
-    document.getElementById('login-password').value = 'admin123';
-    document.getElementById('demo-admin').classList.add('active');
-  } else {
-    document.getElementById('login-email').value = 'redflow@expertev.com';
-    document.getElementById('login-password').value = 'redflow123';
-    document.getElementById('demo-contractor').classList.add('active');
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btnEl = document.getElementById('login-btn');
+
+  if (!email || !pass) {
+    errEl.textContent = 'Please enter your email and password.';
+    errEl.style.display = 'block';
+    return;
   }
-}
-function doLogin() {
-  const email = document.getElementById('login-email').value;
-  const pass = document.getElementById('login-password').value;
-  const user = USERS[email];
-  if (user && user.password === pass) {
-    currentUser = {...user, email};
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
+
+  // Disable button while authenticating
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Signing in…'; }
+  errEl.style.display = 'none';
+
+  if (isSupabaseReady()) {
+    // ── Supabase Auth path ──────────────────────────────────────
+    console.log('[LOGIN] Calling sbSignIn:', email, '| pass length:', pass.length, '| first char code:', pass.charCodeAt(0));
+    const { user, session, error } = await sbSignIn(email, pass);
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Sign In'; }
+    console.log('[LOGIN] sbSignIn result — error:', error ?? 'none', '| user:', user?.email ?? 'none');
+
+    if (!error) {
+      // Supabase sign-in succeeded
+      await _resolveAuthUser(user);
+      if (!currentUser) {
+        errEl.textContent = 'Account not recognized. Contact your administrator.';
+        errEl.style.display = 'block';
+        return;
+      }
+      // Guard: confirm resolved role matches what was expected. Log the routing decision.
+      console.log('[LOGIN] Role resolved:', currentUser.role, '| routing to:', currentUser.role === 'admin' ? 'dashboard' : 'my-leads');
+    } else {
+      // ── DEV ONLY: local USERS fallback when Supabase auth fails ──
+      // Disable by setting DEV_MODE = false in js/config.js before going live.
+      if (typeof DEV_MODE !== 'undefined' && DEV_MODE) {
+        console.warn('[DEV] Supabase auth failed (' + error + ') — trying local USERS fallback.');
+        const demoUser = typeof USERS !== 'undefined' ? USERS[email] : null;
+        console.log('[DEV] USERS lookup for', email, ':', demoUser ? 'found (role=' + demoUser.role + ')' : 'not found');
+        if (demoUser && demoUser.password === pass) {
+          currentUser = { ...demoUser, email };
+          console.warn('[DEV] Signed in via local USERS. This path is blocked when DEV_MODE=false.');
+        } else {
+          // Show the real Supabase error so we can diagnose the problem
+          errEl.textContent = 'Supabase error: ' + error + (demoUser ? ' (local fallback: password mismatch)' : ' (local fallback: email not in USERS)');
+          errEl.style.display = 'block';
+          return;
+        }
+      } else {
+        // ── Production: Supabase failure = hard stop ──────────────
+        errEl.textContent = 'Incorrect email or password.';
+        errEl.style.display = 'block';
+        return;
+      }
+    }
+  } else {
+    // ── No Supabase configured — use USERS demo data ────────────
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Sign In'; }
+    const user = typeof USERS !== 'undefined' ? USERS[email] : null;
+    if (user && user.password === pass) {
+      currentUser = { ...user, email };
+    } else {
+      errEl.textContent = 'Incorrect email or password.';
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  try {
     initApp();
-  } else {
-    document.getElementById('login-error').style.display = 'block';
+  } catch (initErr) {
+    console.error('[doLogin] initApp threw:', initErr);
+    if (typeof _showDashboardError === 'function') {
+      _showDashboardError('Dashboard failed to load. Please try again.', true);
+    }
+    return;
   }
 }
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin(); });
-function doLogout() {
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+});
+
+async function doLogout() {
+  _teardownRealtimeSubscriptions();
+  if (isSupabaseReady()) await sbSignOut();
   currentUser = null;
+  currentContractor = null;
+  dbContractors = [];
+  // Clear in-memory lead and notification data so prior user's data never leaks
+  // to the next login session within the same browser tab.
+  leads.splice(0, leads.length);
+  notifications.splice(0, notifications.length);
+  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
+  _lastNewLeadCount = -1;
+  // Clear portal intent so a fresh page visit shows the public site.
+  sessionStorage.removeItem('ev_portal_open');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-error').style.display = 'none';
+}
+
+/**
+ * Given a Supabase Auth user object, populate currentUser (and currentContractor
+ * for contractor logins). Handles admin detection and contractor auto-link by email.
+ */
+/**
+ * NOTE — same-browser multi-account behavior:
+ * Supabase stores auth state in localStorage, which is SHARED across all tabs
+ * in the same browser profile. If admin is signed in and a contractor opens a new
+ * tab, they share the same session. The most-recent sbSignIn() call wins.
+ * To use admin and contractor simultaneously, use separate browser profiles or
+ * an incognito window for the second account.
+ * This function always resolves from the CURRENT Supabase session (backend truth)
+ * and will never route a user to the wrong dashboard for the active session.
+ */
+async function _resolveAuthUser(authUser) {
+  if (!authUser) { currentUser = null; return; }
+  const email = authUser.email?.toLowerCase() ?? '';
+  const adminEmail = (settings.adminEmail ?? '').toLowerCase();
+
+  console.log('[AUTH] _resolveAuthUser | email:', email, '| adminEmail from settings:', adminEmail,
+    '| email match:', email === adminEmail,
+    '| app_metadata.role:', authUser.app_metadata?.role ?? 'none');
+  if (email === adminEmail || authUser.app_metadata?.role === 'admin') {
+    // ── Admin ───────────────────────────────────────────────────
+    currentUser = { email, role: 'admin', name: 'Admin' };
+    currentContractor = null;
+    // Await contractor load so initApp() renders with real data, not demo fallback
+    await _loadDbContractors();
+  } else {
+    // ── Contractor ──────────────────────────────────────────────
+    let record = await sbFetchCurrentContractor(authUser.id);
+
+    if (!record) {
+      // Auto-link: contractor was created before auth existed — match by email
+      const { data: rows } = await (_db()?.from('contractors').select('*').eq('email', email).maybeSingle() ?? Promise.resolve({ data: null }));
+      if (rows) {
+        await sbLinkContractorToAuth(rows.id, authUser.id);
+        record = await sbFetchCurrentContractor(authUser.id);
+      }
+    }
+
+    if (!record) { currentUser = null; return; } // unknown account
+
+    currentContractor = record;
+    currentUser = {
+      email,
+      role: 'contractor',
+      name: record.companyName || record.name,
+      id:   record.id,
+    };
+
+    // Update last_login_at (non-blocking but logged so we can confirm it fires)
+    if (isSupabaseReady()) {
+      _db()?.from('contractors')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', record.id)
+        .then(({ error }) => {
+          if (error) console.warn('[resolveAuthUser] last_login_at update failed:', error.message);
+          else console.log('[resolveAuthUser] last_login_at set for contractor:', record.id);
+        });
+    }
+  }
+}
+
+/** Load all contractors from Supabase into dbContractors and re-render if the app is live. */
+async function _loadDbContractors() {
+  if (!isSupabaseReady()) {
+    console.log('[contractors] _loadDbContractors — Supabase not ready, skipping fetch. dbContractors stays empty.');
+    return;
+  }
+  console.log('[contractors] _loadDbContractors — fetching from Supabase…');
+  const rows = await sbFetchActiveContractors();
+  if (Array.isArray(rows)) {
+    dbContractors.splice(0, dbContractors.length, ...rows);
+    if (rows.length > 0) {
+      console.log('[contractors] Loaded', rows.length, 'contractor(s) from Supabase:', rows.map(c => c.name));
+    } else {
+      console.log('[contractors] Supabase returned 0 contractors — showing empty state (no demo fallback).');
+    }
+  } else {
+    console.warn('[contractors] sbFetchActiveContractors returned non-array:', rows);
+  }
+  // If the app is already rendered (post-login refresh), re-render pages with real data.
+  // Capture the active page BEFORE buildPages() wipes all active classes, then re-navigate
+  // so the previously-visible page is restored and its data (e.g. assign dropdown) re-renders.
+  if (currentUser && document.getElementById('app')?.style.display !== 'none') {
+    const activePageId = document.querySelector('#pages .page.active')?.id?.replace('page-', '') || 'dashboard';
+    buildPages();
+    buildSidebar();
+    navTo(activePageId);
+  }
+}
+
+/**
+ * Set up Supabase Realtime postgres_changes subscriptions for the current user.
+ * Admin: subscribes to all leads + all contractors.
+ * Contractor: subscribes only to their own assigned leads.
+ * Must be called after initApp() so currentUser is set.
+ */
+function _setupRealtimeSubscriptions() {
+  if (!isSupabaseReady() || !currentUser) return;
+  _teardownRealtimeSubscriptions();
+  console.log('[REALTIME] Setting up subscriptions | role:', currentUser.role,
+    '| NOTE: leads table must be in supabase_realtime publication.',
+    'If no events fire, run: ALTER PUBLICATION supabase_realtime ADD TABLE leads;',
+    'in the Supabase SQL Editor');
+
+  // Debounced leads refresh — prevents rapid consecutive fetches on bulk changes
+  let _leadsTimer = null;
+  const onLeadsChange = (payload) => {
+    console.log('[Realtime] leads change:', payload.eventType);
+    clearTimeout(_leadsTimer);
+    _leadsTimer = setTimeout(() => {
+      if (!currentUser) return;
+      sbFetchLeadsWithNotes().then(rows => {
+        if (!currentUser || !Array.isArray(rows)) return;
+        // Preserve local-only leads not yet in DB (same merge strategy as initApp hydration)
+        const dbIds = new Set(rows.map(r => r.id));
+        const localOnly = leads.filter(l => !dbIds.has(l.id));
+        leads.splice(0, leads.length, ...rows, ...localOnly);
+        persist();
+        buildSidebar();
+        const pg = document.querySelector('#pages .page.active')?.id;
+        if (pg === 'page-all-leads')        renderLeadsTable();
+        else if (pg === 'page-pipeline')    buildPages();
+        else if (pg === 'page-dashboard')   refreshAdminDashboard();
+        else if (pg === 'page-assign')      renderAssignTable();
+        else if (pg === 'page-my-leads')    renderMyLeads();
+        else if (pg === 'page-my-pipeline') buildPages();
+        console.log('[Realtime] leads refreshed —', rows.length, 'rows from DB' + (localOnly.length ? ' + ' + localOnly.length + ' local-only preserved' : ''));
+      }).catch(e => console.warn('[Realtime] leads refresh error:', e.message));
+    }, 600);
+  };
+
+  // Contractor gets a scoped filter so only their leads trigger the event.
+  // currentUser.id is the contractors table TEXT PK (same value written to leads.contractor_id).
+  const leadsFilter = currentUser.role === 'contractor'
+    ? `contractor_id=eq.${currentUser.id}`
+    : undefined;
+  console.log('[Realtime] leads filter:', leadsFilter ?? '(all — admin)');
+  _realtimeSubs.push(sbSubscribeLeads(leadsFilter, onLeadsChange));
+
+  // Contractors table — admin only (shows activation status updates)
+  if (currentUser.role === 'admin') {
+    let _contractorsTimer = null;
+    const onContractorsChange = (payload) => {
+      console.log('[Realtime] contractors change:', payload.eventType);
+      clearTimeout(_contractorsTimer);
+      _contractorsTimer = setTimeout(() => {
+        if (!currentUser || currentUser.role !== 'admin') return;
+        _loadDbContractors();
+      }, 600);
+    };
+    _realtimeSubs.push(sbSubscribeContractors(onContractorsChange));
+  }
+}
+
+/** Remove all active Realtime subscriptions. Called on logout and overlay close. */
+function _teardownRealtimeSubscriptions() {
+  if (_realtimeSubs.length === 0) return;
+  _realtimeSubs.forEach(unsub => { try { unsub(); } catch(e) {} });
+  _realtimeSubs.splice(0, _realtimeSubs.length);
+  console.log('[Realtime] subscriptions torn down');
+}
+
+/**
+ * Set up Supabase auth state listener for password-recovery and invite flows.
+ * Must be called once after initSupabase().
+ */
+function _setupAuthStateChange() {
+  if (!isSupabaseReady()) return;
+  if (_authListenerRegistered) return; // never register twice
+  _authListenerRegistered = true;
+
+  sbOnAuthStateChange(async (event, session) => {
+    console.log('[AuthStateChange] event:', event,
+      '| user:', session?.user?.email ?? 'none',
+      '| _awaitingPasswordSetup:', _awaitingPasswordSetup);
+
+    if (event === 'PASSWORD_RECOVERY') {
+      // User clicked a password-reset link → show set-password form.
+      // Supabase fires this event when it processes a recovery token from the URL.
+      console.log('[AuthStateChange] PASSWORD_RECOVERY — showing password reset UI');
+      _awaitingPasswordSetup = false;
+      _showPasswordResetUI();
+
+    } else if (event === 'SIGNED_IN' && session && _awaitingPasswordSetup) {
+      // Contractor arrived via an invite or recovery link — show set-password form.
+      // We use this flag because Supabase clears the URL hash BEFORE firing SIGNED_IN,
+      // so checking window.location.hash here would always be empty.
+      console.log('[AuthStateChange] SIGNED_IN + _awaitingPasswordSetup — invite/recovery path, showing reset UI');
+      sessionStorage.setItem('ev_portal_open', '1'); // ensure refresh works post-password-set
+      _awaitingPasswordSetup = false;
+      _showPasswordResetUI();
+
+    } else if (event === 'SIGNED_OUT') {
+      console.log('[AuthStateChange] SIGNED_OUT — clearing user state');
+      currentUser = null;
+      currentContractor = null;
+    }
+  });
+}
+
+/** Show the password-reset / set-password panel (for recovery and invite flows) */
+function _showPasswordResetUI() {
+  const loginScreen = document.getElementById('login-screen');
+  const resetPanel  = document.getElementById('reset-password-panel');
+  const loginCard   = document.getElementById('login-card');
+  if (resetPanel) {
+    if (loginCard)   loginCard.style.display   = 'none';
+    if (loginScreen) loginScreen.style.display = 'flex';
+    resetPanel.style.display = 'flex';
+  }
+}
+
+/** Forgot-password: send reset email */
+async function doForgotPassword() {
+  const emailEl = document.getElementById('forgot-email');
+  const msgEl   = document.getElementById('forgot-msg');
+  const email   = emailEl?.value.trim().toLowerCase() ?? '';
+
+  console.log('[doForgotPassword] initiated | email:', email || '(empty)');
+
+  if (!email) {
+    if (msgEl) { msgEl.textContent = 'Please enter your email address.'; msgEl.style.color = 'var(--red)'; msgEl.style.display = 'block'; }
+    return;
+  }
+
+  if (msgEl) { msgEl.textContent = 'Sending…'; msgEl.style.color = 'var(--gray)'; msgEl.style.display = 'block'; }
+
+  console.log('[doForgotPassword] calling sbResetPassword...');
+  const result = await sbResetPassword(email);
+
+  if (result.error) {
+    console.error('[doForgotPassword] sbResetPassword returned error:', result.error);
+    if (msgEl) { msgEl.textContent = result.error; msgEl.style.color = 'var(--red)'; }
+  } else {
+    console.log('[doForgotPassword] request accepted — showing inbox message');
+    if (msgEl) {
+      // Honest message: Supabase returns 200 for unknown emails too (anti-enumeration).
+      // Tell the user to check spam in case delivery is slow or filtered.
+      msgEl.textContent = 'If that email is registered, a reset link is on its way. Check your inbox and spam folder.';
+      msgEl.style.color = 'var(--green)';
+    }
+    if (emailEl) emailEl.style.display = 'none';
+  }
+}
+
+/** Reset-password panel: set a new password after clicking the email link */
+async function doResetPassword() {
+  const newEl  = document.getElementById('rp-new');
+  const confEl = document.getElementById('rp-confirm');
+  const errEl  = document.getElementById('rp-error');
+  const btnEl  = document.getElementById('rp-btn');
+
+  const newPw  = newEl?.value  ?? '';
+  const confPw = confEl?.value ?? '';
+
+  if (!newPw || newPw.length < 8) {
+    if (errEl) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPw !== confPw) {
+    if (errEl) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Saving…'; }
+  if (errEl) errEl.style.display = 'none';
+
+  console.log('[doResetPassword] calling sbUpdatePassword...');
+  const result = await sbUpdatePassword(newPw);
+  console.log('[doResetPassword] sbUpdatePassword result:', result.error ? 'error: ' + result.error : 'success');
+  if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Set Password'; }
+
+  if (result.error) {
+    if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+  } else {
+    // Clear hash so the panel doesn't re-open on refresh
+    history.replaceState(null, '', window.location.pathname);
+
+    // Mark portal as intentionally open so session restore works on any future refresh.
+    sessionStorage.setItem('ev_portal_open', '1');
+
+    // The invite/recovery token already created an active session — try to
+    // auto-route directly to the dashboard without requiring a second login.
+    if (isSupabaseReady()) {
+      try {
+        const session = await sbGetSession();
+        console.log('[doResetPassword] session after password set:', session?.user?.email ?? 'none');
+        if (session?.user) {
+          await _resolveAuthUser(session.user);
+          console.log('[doResetPassword] resolved user:', currentUser?.role ?? 'none', currentUser?.email ?? 'none');
+          if (currentUser) {
+            document.getElementById('login-screen').style.display = 'none';
+            const resetPanel = document.getElementById('reset-password-panel');
+            if (resetPanel) resetPanel.style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+            try {
+              initApp();
+              showToast('Password set — welcome to your dashboard!');
+            } catch (initErr) {
+              console.error('[doResetPassword] initApp threw:', initErr);
+              _showDashboardError('Dashboard failed to load. Please sign in again.', true);
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('[doResetPassword] routing error:', e.message);
+        _showDashboardError('Something went wrong. Please sign in manually.', false);
+        return;
+      }
+    }
+
+    // Fallback: session not available — ask them to sign in manually
+    showToast('Password updated — you can now sign in.');
+    const resetPanel = document.getElementById('reset-password-panel');
+    const loginCard  = document.getElementById('login-card');
+    if (resetPanel) resetPanel.style.display = 'none';
+    if (loginCard)  loginCard.style.display  = '';
+  }
+}
+
+/**
+ * Show a recovery error inside the dashboard overlay so the user never sees
+ * a blank screen. resetState=true clears currentUser (use after a failed
+ * initApp); resetState=false leaves auth state as-is.
+ */
+function _showDashboardError(msg, resetState) {
+  if (resetState) { currentUser = null; currentContractor = null; }
+  const loginScreen = document.getElementById('login-screen');
+  const loginCard   = document.getElementById('login-card');
+  const resetPanel  = document.getElementById('reset-password-panel');
+  const appEl       = document.getElementById('app');
+  if (appEl)       appEl.style.display       = 'none';
+  if (resetPanel)  resetPanel.style.display  = 'none';
+  if (loginCard)   loginCard.style.display   = 'none';
+  if (loginScreen) {
+    loginScreen.style.display = 'flex';
+    // Inject or update a recovery message inside the login-screen
+    let errDiv = document.getElementById('_dash-recovery-msg');
+    if (!errDiv) {
+      errDiv = document.createElement('div');
+      errDiv.id = '_dash-recovery-msg';
+      errDiv.style.cssText = 'background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;padding:14px 18px;border-radius:10px;font-size:.88rem;text-align:center;max-width:360px;margin:0 auto 16px;';
+      loginScreen.prepend(errDiv);
+    }
+    errDiv.innerHTML = `<strong>⚠ ${sanitizeHTML(msg)}</strong><br><button onclick="document.getElementById('_dash-recovery-msg').remove(); document.getElementById('login-card').style.display=''; " style="margin-top:8px;background:none;border:1px solid rgba(239,68,68,.5);color:#f87171;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.82rem">Return to Login</button>`;
+  }
+}
+
+/** Change-password from My Profile page (contractor must already be signed in) */
+async function doChangePassword() {
+  const newEl  = document.getElementById('cp-new');
+  const confEl = document.getElementById('cp-confirm');
+  const errEl  = document.getElementById('cp-error');
+
+  const newPw  = newEl?.value  ?? '';
+  const confPw = confEl?.value ?? '';
+
+  if (!newPw || newPw.length < 8) {
+    if (errEl) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (newPw !== confPw) {
+    if (errEl) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  if (errEl) errEl.style.display = 'none';
+
+  const result = await sbUpdatePassword(newPw);
+  if (result.error) {
+    if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+  } else {
+    showToast('Password updated successfully.');
+    if (newEl)  newEl.value  = '';
+    if (confEl) confEl.value = '';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // APP INIT
 // ═══════════════════════════════════════════════════════════════
 function initApp() {
+  console.log('[BUILD] initApp — version=forensic-fix-2026-03-14-v1 | role:', currentUser?.role, '| email:', currentUser?.email, '| Supabase ready:', isSupabaseReady());
   const av = document.getElementById('user-avatar');
-  if (currentUser.role === 'contractor') {
-    av.innerHTML = '<img src="redflowelectric.png" alt="Red Flow Electric" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-    av.textContent = '';
-  } else {
-    av.textContent = currentUser.name[0];
-  }
+  const nameInitial = (currentUser.name || currentUser.email || '?')[0].toUpperCase();
+  av.textContent = nameInitial;
   av.className = 'user-avatar ' + currentUser.role;
   document.getElementById('user-name-display').textContent = currentUser.name;
   document.getElementById('user-role-display').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Contractor Partner';
@@ -959,21 +1389,77 @@ function initApp() {
   buildPages();
   buildSidebar();
   navTo(currentUser.role === 'admin' ? 'dashboard' : 'my-leads');
+  // Seed poll baseline and start lead-polling interval
+  _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
+  if (_pollInterval) clearInterval(_pollInterval);
+  _pollInterval = setInterval(_pollNewLeads, 10000);
+  // Hydrate from Supabase in the background.
+  // Strategy: DB is the source of truth. Any locally-staged leads (id not in DB)
+  // are preserved so nothing is lost if a previous insert failed transiently.
+  if (isSupabaseReady()) {
+    sbFetchLeadsWithNotes().then(rows => {
+      if (!currentUser) return; // user may have logged out while fetch was in flight
+      if (!Array.isArray(rows)) {
+        console.warn('[DB] hydrate: sbFetchLeadsWithNotes returned non-array — keeping local data');
+        return;
+      }
+      // Build a set of IDs that exist in DB
+      const dbIds = new Set(rows.map(r => r.id));
+      // Preserve any local-only leads not yet confirmed in DB (e.g., failed insert)
+      const localOnly = leads.filter(l => !dbIds.has(l.id));
+      if (localOnly.length > 0) {
+        console.warn('[DB] hydrate: found', localOnly.length, 'local-only lead(s) not in Supabase:', localOnly.map(l => l.id));
+      }
+      // Merge: DB rows first (authoritative), then any local-only leftovers
+      // Capture active page BEFORE buildPages() wipes all active classes.
+      const activePageId = document.querySelector('#pages .page.active')?.id?.replace('page-', '') || 'dashboard';
+      leads.splice(0, leads.length, ...rows, ...localOnly);
+      persist();
+      buildPages();
+      buildSidebar();
+      _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
+      console.log('[DB] Hydrated', rows.length, 'leads from Supabase' + (localOnly.length ? ' + ' + localOnly.length + ' local-only preserved' : ''));
+      // Re-activate the page that was visible before rebuild — triggers renderAssignTable(),
+      // renderLeadsTable() etc. as appropriate. refreshAdminDashboard() is called via navTo('dashboard').
+      navTo(activePageId);
+    }).catch(e => console.warn('[DB] hydrate:', e.message));
+  }
+  // Subscribe to realtime changes (leads + contractors for admin)
+  _setupRealtimeSubscriptions();
 }
 
-const ADMIN_NAV = [
-  { section:'Overview', items:[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'pipeline',icon:'📋',label:'Pipeline'}] },
-  { section:'Leads',    items:[{id:'all-leads',icon:'⚡',label:'All Leads',badgeNew:true},{id:'assign',icon:'🔄',label:'Assign Leads',badgeNew:true}] },
-  { section:'People',   items:[{id:'contractors',icon:'🔧',label:'Contractors'}] },
-  { section:'Business', items:[{id:'revenue',icon:'💰',label:'Revenue'},{id:'coverage',icon:'🗺️',label:'Coverage'},{id:'sms-templates',icon:'💬',label:'SMS Templates'},{id:'deploy',icon:'🚀',label:'Launch Guide'}] },
-  { section:'Setup',    items:[{id:'onboarding',icon:'✅',label:'Setup Checklist',badgeSetup:true},{id:'settings',icon:'⚙️',label:'Settings'}] },
-];
-const CONTRACTOR_NAV = [
-  { section:'My Work',   items:[{id:'my-leads',icon:'⚡',label:'My Leads',badgeAssigned:true},{id:'my-pipeline',icon:'📋',label:'My Pipeline'},{id:'my-revenue',icon:'📊',label:'Performance'}] },
-  { section:'Resources', items:[{id:'sms-templates',icon:'💬',label:'SMS Scripts'},{id:'my-profile',icon:'🏢',label:'My Profile'}] },
-];
+function _pollNewLeads() {
+  if (!currentUser) return;
+  try {
+    const raw = localStorage.getItem(_STORE.leads);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    if (!Array.isArray(stored)) return;
+    // Detect leads added in another tab or session
+    const storedNewIds = stored.filter(l => l.status === 'new').map(l => l.id);
+    const knownIds     = leads.filter(l => l.status === 'new').map(l => l.id);
+    const brandNew     = storedNewIds.filter(id => !knownIds.includes(id));
+    if (brandNew.length > 0) {
+      // Sync leads array from storage
+      leads.splice(0, leads.length, ...stored);
+      brandNew.forEach(id => {
+        const l = leads.find(x => x.id === id);
+        if (l) addNotification(`<strong>New lead — ${sanitizeHTML(l.name)}</strong><br>${sanitizeHTML(l.county)} · ${sanitizeHTML(l.service)}`);
+      });
+      buildSidebar();
+      persist();
+      // Refresh active data views
+      if (document.getElementById('page-all-leads')?.classList.contains('active'))  renderLeadsTable();
+      if (document.getElementById('page-pipeline')?.classList.contains('active'))    buildPages(); // rebuild pipeline
+      if (document.getElementById('page-assign')?.classList.contains('active'))      renderAssignTable();
+    }
+    _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
+  } catch(e) { /* storage read failed — no-op */ }
+}
+
 
 function buildSidebar() {
+  if (!currentUser) return;
   const nav = currentUser.role === 'admin' ? ADMIN_NAV : CONTRACTOR_NAV;
   let html = '';
   nav.forEach(section => {
@@ -982,29 +1468,69 @@ function buildSidebar() {
       let badge = '';
       if (item.badgeNew) { const cnt = leads.filter(l => l.status === 'new').length; if (cnt > 0) badge = `<span class="nav-badge red">${cnt}</span>`; }
       if (item.badgeAssigned) { const cnt = leads.filter(l => l.contractor === currentUser.id && l.status === 'assigned').length; if (cnt > 0) badge = `<span class="nav-badge">${cnt}</span>`; }
-      if (item.badgeSetup) { const done = checklist.filter(c => settings.checklistDone[c.id]).length; const rem = checklist.length - done; if (rem > 0) badge = `<span class="nav-badge" style="background:var(--orange)">${rem}</span>`; }
       html += `<div class="nav-item" id="nav-${item.id}" onclick="navTo('${item.id}')"><span class="nav-icon">${item.icon}</span>${item.label}${badge}</div>`;
     });
   });
   document.getElementById('sidebar-nav').innerHTML = html;
 }
 
-const PAGE_TITLES = { dashboard:'Dashboard Overview', pipeline:'Lead Pipeline', 'all-leads':'All Leads', assign:'Assign Leads', contractors:'Contractors', revenue:'Revenue & Billing', coverage:'Coverage Map', 'sms-templates':'SMS Scripts & Sales Tools', deploy:'🚀 Launch Guide', onboarding:'Setup Checklist', settings:'Settings & Security', 'my-leads':'My Leads', 'my-pipeline':'My Pipeline', 'my-revenue':'Performance Analytics', 'my-profile':'My Profile' };
+
+/* ── Mobile sidebar toggle ── */
+function toggleDashSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('dash-sidebar-backdrop');
+  const opening  = !sidebar.classList.contains('mob-open');
+  sidebar.classList.toggle('mob-open', opening);
+  if (backdrop) backdrop.classList.toggle('mob-open', opening);
+}
+
+function closeDashSidebar() {
+  document.getElementById('sidebar')?.classList.remove('mob-open');
+  document.getElementById('dash-sidebar-backdrop')?.classList.remove('mob-open');
+}
 
 function navTo(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navEl = document.getElementById('nav-' + id);
   if (navEl) navEl.classList.add('active');
+  // Rebuild dynamic pages before making them active so data is always fresh
+  if (id === 'dashboard' && currentUser?.role === 'admin') refreshAdminDashboard();
   document.querySelectorAll('#pages .page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + id);
   if (page) { page.classList.add('active'); document.getElementById('topbar-title').textContent = PAGE_TITLES[id] || id; }
   if (id === 'all-leads')   renderLeadsTable();
   if (id === 'assign')      renderAssignTable();
   if (id === 'my-leads')    renderMyLeads();
-  if (id === 'onboarding')  renderChecklist();
   if (id === 'dashboard')   setTimeout(renderFollowUpAlerts, 50);
   document.getElementById('notif-panel').classList.remove('open');
   notifOpen = false;
+  closeDashSidebar(); // close sidebar drawer on mobile after navigating
+}
+
+/* Replaces the admin dashboard page node with freshly computed HTML so stat
+   counts always reflect the live leads array, not the login-time snapshot. */
+function refreshAdminDashboard() {
+  const el = document.getElementById('page-dashboard');
+  if (!el) return;
+  const wasActive = el.classList.contains('active');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = pgAdminDashboard();
+  const newEl = tmp.firstElementChild;
+  if (wasActive) newEl.classList.add('active');
+  el.parentNode.replaceChild(newEl, el);
+}
+
+/* Replaces the coverage page node so it always reflects the current API key
+   and live lead counts. The map init runs separately via initCoverageMap(). */
+function refreshCoveragePage() {
+  const el = document.getElementById('page-coverage');
+  if (!el) return;
+  const wasActive = el.classList.contains('active');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = pgCoverage();
+  const newEl = tmp.firstElementChild;
+  if (wasActive) newEl.classList.add('active');
+  el.parentNode.replaceChild(newEl, el);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1014,7 +1540,7 @@ function buildPages() {
   const c = document.getElementById('pages');
   let html = '';
   if (currentUser.role === 'admin') {
-    html += pgAdminDashboard() + pgPipeline() + pgAllLeads() + pgAssign() + pgContractors() + pgRevenue() + pgCoverage() + pgSmsTemplates() + pgDeploy() + pgOnboarding() + pgSettings();
+    html += pgAdminDashboard() + pgPipeline() + pgAllLeads() + pgAssign() + pgContractors() + pgRevenue() + pgSmsTemplates() + pgSettings();
   } else {
     html += pgMyLeads() + pgMyPipeline() + pgMyRevenue() + pgSmsTemplates() + pgMyProfile();
   }
@@ -1030,35 +1556,32 @@ function pgAdminDashboard() {
   const counties  = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
   const maxC      = Math.max(...counties.map(c => leads.filter(l => l.county===c).length), 1);
   const recent    = leads.slice().reverse().slice(0,6);
-  const done      = checklist.filter(c => settings.checklistDone[c.id]).length;
-  const setupPct  = Math.round(done/checklist.length*100);
   return `<div class="page" id="page-dashboard">
     <div class="page-header">
       <div><h1>Dashboard Overview</h1><p>ExpertEV Installers · PA/NJ Territory</p></div>
       <div class="page-header-actions">
-        <button class="btn btn-outline" onclick="navTo('onboarding')">⚙️ Setup ${setupPct}%</button>
         <button class="btn btn-primary" onclick="openAddLead()">+ New Lead</button>
       </div>
     </div>
-    ${setupPct < 100 ? `<div class="alert-box warn">⚠️ <div><strong>Setup incomplete (${done}/${checklist.length} tasks done)</strong> — Complete the <span style="text-decoration:underline;cursor:pointer" onclick="navTo('onboarding')">Setup Checklist</span> to go live.</div></div>` : `<div class="alert-box success">✅ <div><strong>You're fully set up and live!</strong> All systems configured.</div></div>`}
     <div class="stats-grid">
       <div class="stat-card blue"><div class="stat-icon">⚡</div><div class="stat-value blue">${newC}</div><div class="stat-label">New Leads</div><div class="stat-change up">↑ 3 this week</div></div>
       <div class="stat-card yellow"><div class="stat-icon">🔄</div><div class="stat-value yellow">${pipeline}</div><div class="stat-label">Active Pipeline</div><div class="stat-change up">↑ 2 today</div></div>
       <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-value green">${completed}</div><div class="stat-label">Completed Jobs</div><div class="stat-change up">↑ 1 this week</div></div>
       <div class="stat-card cyan"><div class="stat-icon">💰</div><div class="stat-value cyan">$${revenue.toLocaleString()}</div><div class="stat-label">Revenue Generated</div></div>
-      <div class="stat-card blue"><div class="stat-icon">🔧</div><div class="stat-value blue">${CONTRACTORS.length}</div><div class="stat-label">Active Contractors</div></div>
+      <div class="stat-card blue"><div class="stat-icon">🔧</div><div class="stat-value blue">${_getContractors().length}</div><div class="stat-label">Active Contractors</div></div>
     </div>
     <div class="two-col">
       <div class="card">
         <div class="card-header"><span>⚡</span><div class="card-title">Recent Leads</div><button class="btn btn-outline btn-sm" onclick="navTo('all-leads')">View All</button></div>
-        <table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Status</th><th></th></tr></thead><tbody>
-        ${recent.map(l=>`<tr>
+        <table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>
+        ${recent.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr>
           <td><div class="lead-name">${l.name}</div><div class="lead-sub">${l.phone}</div></td>
           <td>${l.county},${l.state}</td>
-          <td style="font-size:.8rem;max-width:140px">${l.service}</td>
+          <td style="font-size:.8rem">${l.service}</td>
+          <td style="font-size:.8rem;color:var(--gray);max-width:160px">${cn ? `<span title="${sanitizeHTML(cn.text)}">${sanitizeHTML(cn.text.length>60?cn.text.slice(0,60)+'…':cn.text)}</span><button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Full details" style="margin-left:4px;font-size:.7rem">⬆</button>` : '—'}</td>
           <td><span class="badge badge-${l.status}">${cap(l.status)}</span>${l.priority==='high'?'<span class="warn-tag" style="margin-left:4px;font-size:.68rem">HIGH</span>':''}</td>
           <td><button class="btn-icon" onclick="openLeadDetail('${l.id}')">→</button></td>
-        </tr>`).join('')}
+        </tr>`; }).join('')}
         </tbody></table>
       </div>
       <div class="card">
@@ -1097,6 +1620,11 @@ function renderFollowUpAlerts() {
   const list = document.getElementById('followup-list');
   const cntEl = document.getElementById('followup-count');
   if (!list) return;
+  if (!settings.followUpAlerts) {
+    list.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:16px">Follow-up alerts are disabled. Enable in Settings → Notifications.</div>`;
+    if (cntEl) cntEl.textContent = '';
+    return;
+  }
   const now = new Date();
   const uncontacted = leads.filter(l => !l.contactedAt && l.contractor && !['completed','lost'].includes(l.status));
   if (!uncontacted.length) {
@@ -1106,7 +1634,7 @@ function renderFollowUpAlerts() {
   }
   if (cntEl) cntEl.textContent = `${uncontacted.length} pending`;
   list.innerHTML = uncontacted.map(l => {
-    const ctr = CONTRACTORS.find(c=>c.id===l.contractor);
+    const ctr = _getContractors().find(c=>c.id===l.contractor);
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid rgba(30,45,74,.4)">
       <div>
         <div style="font-size:.85rem;font-weight:600;color:var(--white)">${l.name}</div>
@@ -1176,27 +1704,27 @@ function renderLeadsTable() {
     (!county   || l.county   === county)   &&
     (!priority || l.priority === priority)
   );
-  const cName = id => id ? (CONTRACTORS.find(c => c.id === id) || {}).name || '—' : '—';
+  const cName = id => id ? (_getContractors().find(c => c.id === id) || {}).name || '—' : '—';
   const wrap = document.getElementById('leads-table-wrap');
   if (!wrap) return;
   wrap.innerHTML = filtered.length === 0
     ? `<div class="empty-state"><div class="empty-state-icon">🔍</div><h3>No leads found</h3><p>Try adjusting the filters</p></div>`
-    : `<table class="leads-table"><thead><tr><th>ID</th><th>Customer</th><th>County</th><th>Complexity</th><th>Value</th><th>Source</th><th>Contractor</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
-      ${filtered.map(l=>`<tr>
+    : `<table class="leads-table"><thead><tr><th>ID</th><th>Customer</th><th>County</th><th>Description</th><th>Complexity</th><th>Value</th><th>Contractor</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
+      ${filtered.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr>
         <td><span class="mono" style="color:var(--gray);font-size:.78rem">${l.id}</span></td>
         <td><div class="lead-name">${l.name}${l.priority==='high'?'<span class="warn-tag" style="margin-left:6px;font-size:.68rem">HIGH</span>':''}</div><div class="lead-sub">${l.phone}</div></td>
         <td>${l.county},${l.state}</td>
+        <td style="font-size:.78rem;color:var(--gray);max-width:180px">${cn?`<span title="${sanitizeHTML(cn.text)}">${sanitizeHTML(cn.text.length>70?cn.text.slice(0,70)+'…':cn.text)}</span>`:l.service}</td>
         <td style="font-size:.78rem">${l.complexity||'—'}</td>
         <td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td>
-        <td style="font-size:.78rem;color:var(--gray)">${l.leadSource||'Direct'}</td>
         <td style="font-size:.82rem">${cName(l.contractor)}</td>
         <td><span class="badge badge-${l.status}">${cap(l.status)}</span></td>
         <td style="font-size:.8rem;color:var(--gray)">${l.created}</td>
         <td style="display:flex;gap:4px">
-          <button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Details">→</button>
+          <button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Full Details">→</button>
           <button class="btn-icon" onclick="openQualityReview('${l.id}')" title="Quality Review" style="font-size:.8rem">🔍</button>
         </td>
-      </tr>`).join('')}
+      </tr>`; }).join('')}
     </tbody></table>`;
 }
 
@@ -1208,86 +1736,419 @@ function renderAssignTable() {
   const unassigned = leads.filter(l => l.status === 'new');
   const wrap = document.getElementById('assign-table-wrap');
   if (!wrap) return;
+
+  const allContractors = _getContractors();
+  console.log('[Assign] contractors available:', allContractors.length, allContractors.map(c => c.name + '(counties:' + (c.counties||[]).length + ')'));
+
   wrap.innerHTML = unassigned.length === 0
     ? `<div class="card"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>All leads assigned!</h3><p>New leads appear here as they come in.</p></div></div>`
     : `<div class="card"><table class="leads-table"><thead><tr><th>Customer</th><th>County / State</th><th>Service</th><th>Value</th><th>Priority</th><th>Assign To</th><th></th></tr></thead><tbody>
-      ${unassigned.map(l=>`<tr>
-        <td><div class="lead-name">${l.name}</div><div class="lead-sub">${l.address}</div></td>
-        <td>${l.county},${l.state}</td>
-        <td style="font-size:.8rem">${l.service}</td>
-        <td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td>
-        <td><select class="filter-select" style="font-size:.75rem;padding:4px 8px" onchange="setLeadPriority('${l.id}',this.value)"><option value="normal" ${l.priority==='normal'?'selected':''}>Normal</option><option value="high" ${l.priority==='high'?'selected':''}>High</option></select></td>
-        <td><select class="filter-select" id="asel-${l.id}" style="width:190px"><option value="">Select contractor...</option>${CONTRACTORS.filter(c=>c.counties.includes(l.county)).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></td>
-        <td><button class="btn btn-primary btn-sm" onclick="assignLead('${l.id}')">Assign →</button></td>
-      </tr>`).join('')}
+      ${unassigned.map(l => {
+        // Split contractors: county-match first (if any), then all others.
+        // This gives a useful suggestion without hiding anyone.
+        const inCounty  = allContractors.filter(c => (c.counties||[]).includes(l.county));
+        const outCounty = allContractors.filter(c => !(c.counties||[]).includes(l.county));
+        const countyOpts = inCounty.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        const otherOpts  = outCounty.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        const opts = inCounty.length && outCounty.length
+          ? `<optgroup label="Covers ${l.county}">${countyOpts}</optgroup><optgroup label="All others">${otherOpts}</optgroup>`
+          : (countyOpts || otherOpts);
+        return `<tr>
+          <td><div class="lead-name">${l.name}</div><div class="lead-sub">${l.address}</div></td>
+          <td>${l.county},${l.state}</td>
+          <td style="font-size:.8rem">${l.service}</td>
+          <td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td>
+          <td><select class="filter-select" style="font-size:.75rem;padding:4px 8px" onchange="setLeadPriority('${l.id}',this.value)"><option value="normal" ${l.priority==='normal'?'selected':''}>Normal</option><option value="high" ${l.priority==='high'?'selected':''}>High</option></select></td>
+          <td><select class="filter-select" id="asel-${l.id}" style="width:190px"><option value="">Select contractor...</option>${opts}</select></td>
+          <td><button class="btn btn-primary btn-sm" onclick="assignLead('${l.id}')">Assign →</button></td>
+        </tr>`;
+      }).join('')}
     </tbody></table></div>`;
 }
 function setLeadPriority(id, priority) { const l = leads.find(x=>x.id===id); if(l) l.priority=priority; }
-function assignLead(lid) {
+async function assignLead(lid) {
   const sel = document.getElementById('asel-' + lid);
   if (!sel || !sel.value) { showToast('Please select a contractor first'); return; }
   const lead = leads.find(l=>l.id===lid);
   if (!lead) return;
-  const contractor = CONTRACTORS.find(c=>c.id===sel.value) || {};
+
+  const contractor = _getContractors().find(c=>c.id===sel.value) || {};
+  const contractorName = contractor.name || sel.value;
+
+  // Disable the assign button to prevent double-click
+  const btn = document.querySelector(`#asel-${lid}`)?.closest('tr')?.querySelector('.btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  if (isSupabaseReady()) {
+    console.log('[Assign] Writing to DB:', JSON.stringify({ step: 'lead_assignment', lead_id: lid, contractor_id: sel.value }));
+    let dbResult = null;
+    try {
+      dbResult = await sbAssignLead(lid, sel.value);
+    } catch (e) {
+      console.error('[Assign] sbAssignLead threw:', e.message);
+    }
+
+    if (!dbResult) {
+      console.error('[Assign]', JSON.stringify({ step: 'lead_assignment', lead_id: lid, contractor_id: sel.value, result: 'failure', error: 'DB update returned null — likely RLS policy or connection issue' }));
+      if (btn) { btn.disabled = false; btn.textContent = 'Assign →'; }
+      showToast('⚠ Assignment failed — database did not confirm. Check console for details.');
+      return;
+    }
+    console.log('[Assign]', JSON.stringify({ step: 'lead_assignment', lead_id: lid, contractor_id: sel.value, result: 'success' }));
+  }
+
+  // Only update local state + show success after DB confirms (or if Supabase not configured)
   lead.status = 'assigned';
   lead.contractor = sel.value;
-  addNote(lid, 'Admin', `Assigned to ${contractor.name}.`);
+  addNote(lid, 'Admin', `Assigned to ${contractorName}.`);
   renderAssignTable(); buildSidebar();
   persist();
-  showToast('Lead assigned to ' + contractor.name);
-  addNotification(`Lead assigned to <strong>${sanitizeHTML(contractor.name)}</strong> — ${sanitizeHTML(lead.name)}`);
+  showToast('Lead assigned to ' + contractorName);
+  addNotification(`Lead assigned to <strong>${sanitizeHTML(contractorName)}</strong> — ${sanitizeHTML(lead.name)}`);
 }
 
-// ─── CONTRACTORS ────────────────────────────────────────────────
+// ─── CONTRACTORS ─────────────────────────────────────────────────────────────
 function pgContractors() {
+  const list = _getContractors();
+  if (list.length === 0) {
+    return `<div class="page" id="page-contractors">
+      <div class="page-header"><div><h1>Contractors</h1><p>No partner contractors yet</p></div>
+      <button class="btn btn-primary" onclick="showAddContractorModal()">+ Add Contractor</button></div>
+      <div class="empty-state" style="padding:60px 0">
+        <div class="empty-state-icon">🔧</div>
+        <h3>No contractors yet</h3>
+        <p style="color:var(--gray);font-size:.9rem;margin-top:8px">Add your first contractor to start assigning leads.</p>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="showAddContractorModal()">+ Add Contractor</button>
+      </div>
+    </div>`;
+  }
   return `<div class="page" id="page-contractors">
-    <div class="page-header"><div><h1>Contractors</h1><p>${CONTRACTORS.length} active partner contractors</p></div>
-    <button class="btn btn-outline" onclick="showAddContractorModal()">+ Invite Contractor</button></div>
+    <div class="page-header"><div><h1>Contractors</h1><p>${list.length} active partner contractor${list.length !== 1 ? 's' : ''}</p></div>
+    <button class="btn btn-primary" onclick="showAddContractorModal()">+ Add Contractor</button></div>
     <div style="display:flex;flex-direction:column;gap:14px">
-    ${CONTRACTORS.map(c=>`<div class="contractor-card">
-      <div class="contractor-avatar" style="${c.id==='c1' ? 'background:#e53935;overflow:hidden;' : 'background:linear-gradient(135deg,var(--green),#059669)'}">${c.id==='c1' ? '<img src="redflowelectric.png" alt="Red Flow Electric" style="width:100%;height:100%;object-fit:cover;">' : c.name[0]}</div>
-      <div class="contractor-info">
-        <div class="contractor-name">${c.name} <span class="badge badge-completed" style="font-size:.7rem;margin-left:6px">Active</span></div>
-        <div class="contractor-meta">${c.contact} · ${c.phone} · ${c.email}</div>
-        <div class="contractor-meta" style="margin-top:3px">🪪 ${c.license} &nbsp;·&nbsp; 📍 ${c.counties.join(', ')}</div>
-      </div>
-      <div class="contractor-stats">
-        <div><div class="c-stat-val">${leads.filter(l=>l.contractor===c.id).length}</div><div class="c-stat-lbl">Leads</div></div>
-        <div><div class="c-stat-val" style="color:var(--green)">${leads.filter(l=>l.contractor===c.id&&l.status==='completed').length}</div><div class="c-stat-lbl">Won</div></div>
-        <div><div class="c-stat-val" style="color:var(--cyan)">${leads.filter(l=>l.contractor===c.id&&l.contactedAt).length}</div><div class="c-stat-lbl">Contacted</div></div>
-        <div><div class="c-stat-val" style="color:var(--cyan)">$${(leads.filter(l=>l.contractor===c.id&&l.status==='completed').reduce((s,l)=>s+l.value,0)/1000).toFixed(1)}k</div><div class="c-stat-lbl">Revenue</div></div>
-        <div><div class="c-stat-val" style="color:var(--yellow)">${leads.filter(l=>l.contractor===c.id).length?Math.round(leads.filter(l=>l.contractor===c.id&&l.status==='completed').length/leads.filter(l=>l.contractor===c.id).length*100)+'%':'—'}</div><div class="c-stat-lbl">Close Rate</div></div>
-        <div><div class="c-stat-val" style="color:var(--yellow)">⭐${c.rating}</div><div class="c-stat-lbl">Rating</div></div>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="viewContractor('${c.id}')">Details →</button>
-    </div>`).join('')}
+    ${list.map(c => {
+      const cLeads     = leads.filter(l => l.contractor === c.id);
+      const cCompleted = cLeads.filter(l => l.status === 'completed');
+      const cRevenue   = cCompleted.reduce((s, l) => s + l.value, 0);
+      const initial    = (c.companyName || c.name || '?')[0].toUpperCase();
+      const inviteTag  = c.lastLoginAt
+        ? `<span class="badge badge-completed" style="font-size:.68rem;margin-left:6px">Activated</span>`
+        : c.invitedAt
+          ? `<span class="badge" style="font-size:.68rem;margin-left:6px;background:rgba(59,130,246,.15);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)">Invite Sent</span>`
+          : `<span class="badge" style="font-size:.68rem;margin-left:6px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">Pending Invite</span>`;
+      return `<div class="contractor-card">
+        <div class="contractor-avatar" style="background:linear-gradient(135deg,var(--blue-bright),var(--green))">${initial}</div>
+        <div class="contractor-info">
+          <div class="contractor-name">${sanitizeHTML(c.companyName || c.name)} ${c.isActive !== false ? `<span class="badge badge-completed" style="font-size:.7rem;margin-left:6px">Active</span>` : `<span class="badge" style="font-size:.7rem;margin-left:6px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)">Inactive</span>`}${inviteTag}</div>
+          <div class="contractor-meta">${sanitizeHTML(c.contactName || c.contact)} · ${sanitizeHTML(c.phone)} · ${sanitizeHTML(c.email)}</div>
+          <div class="contractor-meta" style="margin-top:3px">🪪 ${sanitizeHTML(c.license || '—')} &nbsp;·&nbsp; 📍 ${sanitizeHTML((c.counties || []).slice(0,4).join(', '))}${(c.counties||[]).length > 4 ? ` +${c.counties.length-4} more` : ''}</div>
+        </div>
+        <div class="contractor-stats">
+          <div><div class="c-stat-val">${cLeads.length}</div><div class="c-stat-lbl">Leads</div></div>
+          <div><div class="c-stat-val" style="color:var(--green)">${cCompleted.length}</div><div class="c-stat-lbl">Won</div></div>
+          <div><div class="c-stat-val" style="color:var(--cyan)">$${(cRevenue/1000).toFixed(1)}k</div><div class="c-stat-lbl">Revenue</div></div>
+          <div><div class="c-stat-val" style="color:var(--yellow)">⭐${c.rating || '—'}</div><div class="c-stat-lbl">Rating</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="editContractor('${c.id}')">✏️ Edit</button>
+          <button class="btn btn-outline btn-sm" onclick="viewContractor('${c.id}')">Details →</button>
+          ${c.lastLoginAt ? '' : c.invitedAt
+            ? `<button class="btn btn-sm" id="invite-btn-${c.id}" style="background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.35)" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Resend Invite</button>`
+            : `<button class="btn btn-sm" id="invite-btn-${c.id}" style="background:rgba(59,130,246,.15);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Send Invite</button>`
+          }
+          <button class="btn btn-sm" style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.25)" onclick="deleteContractor('${c.id}')">Delete</button>
+        </div>
+      </div>`;
+    }).join('')}
     </div>
   </div>`;
 }
+
 function viewContractor(id) {
-  const c = CONTRACTORS.find(x=>x.id===id);
-  const cLeads = leads.filter(l=>l.contractor===id);
-  openModalWith(c.name,`
-    <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${c.contact}</div></div>
-    <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value"><a href="tel:${c.phone}" style="color:var(--blue-bright);text-decoration:none">${c.phone}</a></div></div>
-    <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value"><a href="mailto:${c.email}" style="color:var(--blue-bright);text-decoration:none">${c.email}</a></div></div>
-    <div class="detail-row"><div class="detail-label">License</div><div class="detail-value mono">${c.license}</div></div>
-    <div class="detail-row"><div class="detail-label">Coverage</div><div class="detail-value">${c.counties.join(', ')}</div></div>
-    <div class="detail-row"><div class="detail-label">Revenue</div><div class="detail-value" style="color:var(--cyan)">$${c.revenue.toLocaleString()}</div></div>
-    <div class="detail-row"><div class="detail-label">Rating</div><div class="detail-value">⭐ ${c.rating}</div></div>
+  const c = _getContractors().find(x => x.id === id);
+  if (!c) return;
+  const cLeads = leads.filter(l => l.contractor === id);
+  openModalWith(sanitizeHTML(c.companyName || c.name), `
+    <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${sanitizeHTML(c.contactName || c.contact || '—')}</div></div>
+    <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value"><a href="tel:${sanitizeHTML(c.phone)}" style="color:var(--blue-bright);text-decoration:none">${sanitizeHTML(c.phone || '—')}</a></div></div>
+    <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value"><a href="mailto:${sanitizeHTML(c.email)}" style="color:var(--blue-bright);text-decoration:none">${sanitizeHTML(c.email || '—')}</a></div></div>
+    <div class="detail-row"><div class="detail-label">License</div><div class="detail-value mono">${sanitizeHTML(c.license || '—')}</div></div>
+    <div class="detail-row"><div class="detail-label">Coverage</div><div class="detail-value">${sanitizeHTML((c.counties||[]).join(', ') || '—')}</div></div>
+    <div class="detail-row"><div class="detail-label">Revenue</div><div class="detail-value" style="color:var(--cyan)">$${(c.revenue||0).toLocaleString()}</div></div>
+    <div class="detail-row"><div class="detail-label">Rating</div><div class="detail-value">⭐ ${c.rating || '—'}</div></div>
+    <div class="detail-row"><div class="detail-label">Invite Status</div><div class="detail-value">${
+      c.lastLoginAt
+        ? `<span class="badge badge-completed">Activated ${new Date(c.lastLoginAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>`
+        : c.invitedAt
+          ? `<span class="badge" style="background:rgba(59,130,246,.15);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)">Invite Sent ${new Date(c.invitedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+             <button class="btn btn-sm" id="invite-btn-modal-${c.id}" style="margin-left:8px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.35)" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Resend</button>`
+          : `<button class="btn btn-sm btn-primary" id="invite-btn-modal-${c.id}" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Send Invite</button>`
+    }</div></div>
     <div style="margin:16px 0 10px;font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:700">Assigned Leads (${cLeads.length})</div>
-    ${cLeads.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(30,45,74,0.4)"><div><div style="font-size:.85rem;font-weight:500">${l.name}</div><div style="font-size:.75rem;color:var(--gray)">${l.county},${l.state} · $${l.value.toLocaleString()}</div></div><span class="badge badge-${l.status}">${cap(l.status)}</span></div>`).join('')}`,
+    ${cLeads.length === 0 ? '<div style="color:var(--gray);font-size:.85rem">No leads assigned yet.</div>' : cLeads.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(30,45,74,0.4)"><div><div style="font-size:.85rem;font-weight:500">${sanitizeHTML(l.name)}</div><div style="font-size:.75rem;color:var(--gray)">${sanitizeHTML(l.county)},${sanitizeHTML(l.state)} · $${l.value.toLocaleString()}</div></div><span class="badge badge-${l.status}">${cap(l.status)}</span></div>`).join('')}`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Close</button>`);
 }
+
 function showAddContractorModal() {
-  openModalWith('Invite Contractor',`
-    <div class="alert-box info">ℹ️ The contractor will receive a login link via email and can only see their own assigned leads.</div>
-    <div class="form-group"><label class="form-label">Company Name</label><input class="form-input" id="ac-company" placeholder="e.g. Volt Masters LLC"></div>
-    <div class="form-group"><label class="form-label">Contact Person</label><input class="form-input" id="ac-contact" placeholder="Full name"></div>
-    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="ac-email" placeholder="contact@company.com"></div>
-    <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="ac-phone" placeholder="(xxx) xxx-xxxx"></div>
-    <div class="form-group"><label class="form-label">License #</label><input class="form-input" id="ac-lic" placeholder="PA-EL-XXXXX or NJ-EL-XXXXX"></div>`,
-    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button><button class="btn btn-primary" onclick="closeModalDirect();showToast('Invite sent to '+document.getElementById('ac-email').value)">Send Invite →</button>`);
+  const needsSupabase = isSupabaseReady();
+  openModalWith('Invite Contractor', `
+    ${needsSupabase
+      ? `<div class="alert-box info" style="margin-bottom:16px">Fills in contractor details and sends a login invite email in one step.</div>`
+      : `<div class="alert-box warn" style="margin-bottom:16px">⚠️ Supabase not connected — contractor will be saved locally only (no invite email).</div>`
+    }
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Company Name *</label><input class="form-input" id="ac-company" placeholder="e.g. Volt Masters LLC"></div>
+      <div class="form-group"><label class="form-label">Contact Person *</label><input class="form-input" id="ac-contact" placeholder="Full name"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="ac-email" placeholder="contact@company.com"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="ac-phone" placeholder="(xxx) xxx-xxxx"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">License #</label><input class="form-input" id="ac-lic" placeholder="PA-EL-XXXXX or NJ-EL-XXXXX"></div>
+    </div>
+    <div id="ac-error" style="display:none;color:var(--red);font-size:.82rem;margin-top:8px"></div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" id="ac-submit-btn" onclick="saveContractorRecord()">Send Invite →</button>`);
+}
+
+async function saveContractorRecord() {
+  const company = document.getElementById('ac-company')?.value.trim() ?? '';
+  const contact = document.getElementById('ac-contact')?.value.trim() ?? '';
+  const email   = document.getElementById('ac-email')?.value.trim().toLowerCase() ?? '';
+  const phone   = document.getElementById('ac-phone')?.value.trim() ?? '';
+  const license = document.getElementById('ac-lic')?.value.trim()   ?? '';
+  const errEl   = document.getElementById('ac-error');
+  const submitBtn = document.getElementById('ac-submit-btn');
+
+  if (!company || !contact || !email) {
+    if (errEl) { errEl.textContent = 'Company name, contact, and email are required.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (errEl) { errEl.textContent = 'Please enter a valid email address.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const sbSession = isSupabaseReady() ? await sbGetSession() : null;
+
+  // ── Supabase path: edge function creates DB record + auth user + sends invite ──
+  if (sbSession) {
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending…'; }
+    if (errEl) errEl.style.display = 'none';
+
+    const result = await sbInviteContractor(null, email, {
+      company_name: company,
+      contact_name: contact,
+    });
+
+    if (result.error) {
+      // Re-enable button and show error inline (keep modal open)
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Send Invite →'; }
+      let msg = result.error;
+      if (result.step) msg = `[${result.step}] ${msg}`;
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      console.error('[invite] step:', result.step, '| error:', result.error);
+      return;
+    }
+
+    closeModalDirect();
+
+    // Reload contractors from DB so the newly-created record appears with the
+    // real DB-generated ID and invited_at timestamp.
+    await _loadDbContractors();
+    showToast(`Invite sent to ${email} — contractor record created automatically.`);
+    buildPages();
+    navTo('contractors');
+    return;
+  }
+
+  // ── Fallback: no Supabase session — save locally only (no invite sent) ──
+  closeModalDirect();
+  const newRecord = {
+    id:          'c' + Date.now(),
+    companyName: company,
+    contactName: contact,
+    name:        company,
+    contact,
+    email,
+    phone,
+    license,
+    counties:    [],
+    services:    [],
+    leads:       0,
+    completed:   0,
+    revenue:     0,
+    rating:      5.0,
+    status:      'active',
+    isActive:    true,
+  };
+  dbContractors.push(newRecord);
+  const why = isSupabaseReady() ? ' (DEV_MODE — sign in via Supabase to send a real invite)' : ' (no Supabase configured)';
+  showToast(`Contractor "${company}" saved locally${why}.`);
+  buildPages();
+  navTo('contractors');
+}
+
+// Per-session invite cooldowns — prevents spam-clicking (resets on page reload)
+const _inviteCooldowns = {};
+const _INVITE_COOLDOWN_MS = 60_000; // 60 seconds between sends per contractor
+
+async function sendContractorInvite(contractorId, email) {
+  if (!isSupabaseReady()) {
+    showToast('Supabase not connected — cannot send invite.');
+    return;
+  }
+
+  // Cooldown check
+  const lastSent = _inviteCooldowns[contractorId];
+  if (lastSent && Date.now() - lastSent < _INVITE_COOLDOWN_MS) {
+    const secsLeft = Math.ceil((_INVITE_COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
+    showToast(`Please wait ${secsLeft}s before resending to this contractor.`);
+    return;
+  }
+
+  const session = await sbGetSession();
+  if (!session) {
+    showToast('You must be signed in via Supabase Auth to send invites.');
+    return;
+  }
+
+  // Disable button(s) while sending
+  const btns = [
+    document.getElementById(`invite-btn-${contractorId}`),
+    document.getElementById(`invite-btn-modal-${contractorId}`),
+  ].filter(Boolean);
+  const originalLabels = btns.map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Sending…'; });
+
+  showToast('Sending invite…');
+  const result = await sbInviteContractor(contractorId, email);
+
+  if (result.error) {
+    // Re-enable buttons on error
+    btns.forEach((b, i) => { b.disabled = false; b.textContent = originalLabels[i]; });
+
+    let msg = result.error;
+    if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+      msg = 'Could not reach invite function — check that it is deployed.';
+    } else if (msg.toLowerCase().includes('admin access required')) {
+      msg = 'Admin access required. Your account must be recognised as admin.';
+    } else if (msg.toLowerCase().includes('session expired') || msg.toLowerCase().includes('not authenticated')) {
+      msg = 'Session expired — please sign out and sign in again.';
+    } else if (msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('limit')) {
+      msg = 'Email rate limit reached — configure custom SMTP in Supabase Auth to remove this limit.';
+    }
+    const stepPrefix = result.step && result.step !== '(gateway)' ? `[${result.step}] ` : '';
+    showToast('Invite failed: ' + stepPrefix + msg);
+    console.error('[invite] step:', result.step, '| error:', result.error, result.reason || '');
+  } else {
+    _inviteCooldowns[contractorId] = Date.now();
+    const rec = dbContractors.find(c => c.id === contractorId);
+    if (rec) rec.invitedAt = new Date().toISOString();
+    showToast(`Invite sent to ${email}`);
+    buildPages();
+    navTo('contractors');
+  }
+}
+
+function editContractor(id) {
+  const c = _getContractors().find(x => x.id === id);
+  if (!c) return;
+  const counties = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
+  const checkedCounties = (c.counties || []);
+  openModalWith('Edit Contractor', `
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Company Name *</label><input class="form-input" id="ec-company" value="${sanitizeHTML(c.companyName || c.name || '')}"></div>
+      <div class="form-group"><label class="form-label">Contact Person *</label><input class="form-input" id="ec-contact" value="${sanitizeHTML(c.contactName || c.contact || '')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="ec-email" value="${sanitizeHTML(c.email || '')}"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="ec-phone" value="${sanitizeHTML(c.phone || '')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">License #</label><input class="form-input" id="ec-lic" value="${sanitizeHTML(c.license || '')}"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-input" id="ec-status">
+          <option value="active" ${c.status === 'active' ? 'selected' : ''}>Active</option>
+          <option value="inactive" ${c.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Service Counties</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+        ${counties.map(co => `<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;cursor:pointer">
+          <input type="checkbox" id="ec-co-${co.toLowerCase()}" ${checkedCounties.includes(co)?'checked':''}> ${co}
+        </label>`).join('')}
+      </div>
+    </div>
+    <div id="ec-error" style="display:none;color:var(--red);font-size:.82rem;margin-top:8px"></div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveContractorEdit('${id}')">Save Changes →</button>`
+  );
+}
+
+async function saveContractorEdit(id) {
+  const company = document.getElementById('ec-company')?.value.trim() ?? '';
+  const contact = document.getElementById('ec-contact')?.value.trim() ?? '';
+  const email   = document.getElementById('ec-email')?.value.trim().toLowerCase() ?? '';
+  const phone   = document.getElementById('ec-phone')?.value.trim() ?? '';
+  const license = document.getElementById('ec-lic')?.value.trim() ?? '';
+  const status  = document.getElementById('ec-status')?.value ?? 'active';
+  const errEl   = document.getElementById('ec-error');
+
+  if (!company || !contact || !email) {
+    if (errEl) { errEl.textContent = 'Company name, contact, and email are required.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const counties = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
+  const selectedCounties = counties.filter(co => document.getElementById(`ec-co-${co.toLowerCase()}`)?.checked);
+
+  const updates = { companyName: company, name: company, contactName: contact, contact, email, phone, license, status, counties: selectedCounties, isActive: status === 'active' };
+
+  const rec = dbContractors.find(x => x.id === id);
+  if (rec) Object.assign(rec, updates);
+
+  closeModalDirect();
+
+  if (isSupabaseReady()) {
+    const saved = await sbUpdateContractor(id, updates);
+    if (!saved) showToast('Warning: DB update may have failed — check console.');
+  }
+
+  buildPages();
+  navTo('contractors');
+  showToast(`Contractor "${company}" updated.`);
+}
+
+function deleteContractor(id) {
+  const c = _getContractors().find(x => x.id === id);
+  if (!c) return;
+  const name = c.companyName || c.name || 'this contractor';
+  openModalWith('Delete Contractor',
+    `<div class="alert-box warn">⚠️ <div><strong>Are you sure you want to delete "${sanitizeHTML(name)}"?</strong><br>This cannot be undone. Any leads assigned to them will become unassigned.</div></div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);padding:8px 18px" onclick="confirmDeleteContractor('${id}')">Yes, Delete</button>`
+  );
+}
+
+async function confirmDeleteContractor(id) {
+  closeModalDirect();
+  // Remove from in-memory array
+  const idx = dbContractors.findIndex(x => x.id === id);
+  if (idx !== -1) dbContractors.splice(idx, 1);
+  // Unassign any leads that referenced this contractor
+  leads.forEach(l => { if (l.contractor === id) { l.contractor = null; l.status = 'new'; } });
+  persist();
+  // Delete from DB
+  if (isSupabaseReady()) {
+    const { error } = await (_db()?.from('contractors').delete().eq('id', id) ?? Promise.resolve({ error: null }));
+    if (error) console.error('[DB] deleteContractor:', error.message);
+  }
+  buildPages();
+  navTo('contractors');
+  showToast('Contractor removed.');
 }
 
 // ─── REVENUE ────────────────────────────────────────────────────
@@ -1315,7 +2176,7 @@ function pgRevenue() {
       </div>
       <div class="card"><div class="card-header"><span>🔧</span><div class="card-title">By Contractor</div></div>
         <div class="card-body">
-          ${CONTRACTORS.map(c=>`<div class="county-row"><div class="county-name" style="width:140px">${c.name}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(c.revenue/Math.max(...CONTRACTORS.map(x=>x.revenue))*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(c.revenue/1000).toFixed(1)}k</div></div>`).join('')}
+          ${(()=>{ const cs=_getContractors(); const maxRev=Math.max(...cs.map(x=>x.revenue),1); return cs.map(c=>`<div class="county-row"><div class="county-name" style="width:140px">${c.name}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(c.revenue/maxRev*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(c.revenue/1000).toFixed(1)}k</div></div>`).join(''); })()}
           <div style="margin-top:16px;font-size:.8rem;color:var(--gray)">Platform fee per contractor at ${settings.commissionPct}% commission rate</div>
         </div>
       </div>
@@ -1324,7 +2185,7 @@ function pgRevenue() {
       <div class="card-header"><span>✅</span><div class="card-title">Completed Jobs</div></div>
       ${done.length===0?`<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No completed jobs yet</h3></div>`
       :`<table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Contractor</th><th>Job Value</th><th>Platform Fee</th><th>Date</th></tr></thead><tbody>
-        ${done.map(l=>{const c=CONTRACTORS.find(x=>x.id===l.contractor); return `<tr><td>${l.name}</td><td>${l.county},${l.state}</td><td style="font-size:.8rem">${l.service}</td><td style="font-size:.82rem">${c?c.name:'—'}</td><td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td><td style="color:var(--cyan)">$${Math.round(l.value*settings.commissionPct/100).toLocaleString()}</td><td style="font-size:.8rem;color:var(--gray)">${l.created}</td></tr>`;}).join('')}
+        ${done.map(l=>{const c=_getContractors().find(x=>x.id===l.contractor); return `<tr><td>${l.name}</td><td>${l.county},${l.state}</td><td style="font-size:.8rem">${l.service}</td><td style="font-size:.82rem">${c?c.name:'—'}</td><td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td><td style="color:var(--cyan)">$${Math.round(l.value*settings.commissionPct/100).toLocaleString()}</td><td style="font-size:.8rem;color:var(--gray)">${l.created}</td></tr>`;}).join('')}
       </tbody></table>`}
     </div>
   </div>`;
@@ -1336,18 +2197,10 @@ function pgCoverage() {
   const nj = ['Burlington','Camden','Gloucester'];
   return `<div class="page" id="page-coverage">
     <div class="page-header"><div><h1>Coverage Map</h1><p>Active territory — PA and NJ</p></div></div>
-    <div class="alert-box info">🗺️ <div>To add an interactive Google Map, add your Google Maps API key in <span style="cursor:pointer;text-decoration:underline" onclick="navTo('settings')">Settings → Integrations</span>.</div></div>
+    <div id="coverage-map-alert"></div>
     <div class="grid-2">
-      <div class="card"><div class="card-header"><span>🗺️</span><div class="card-title">Territory Map</div></div>
-        <div class="card-body"><div style="height:240px;background:var(--navy-light);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--gray);border:1px dashed var(--navy-border)">
-          <div style="font-size:2.5rem">🗺️</div>
-          <div style="font-weight:600;color:var(--white)">Interactive Map</div>
-          <div style="font-size:.8rem;text-align:center;max-width:260px">Add a Google Maps API key in Settings to activate live territory visualization</div>
-          <div style="display:flex;gap:10px;margin-top:8px">
-            <span style="font-size:.78rem;background:rgba(37,99,235,.15);color:var(--blue-bright);padding:4px 12px;border-radius:20px;border:1px solid rgba(37,99,235,.3)">5 PA Counties</span>
-            <span style="font-size:.78rem;background:rgba(6,182,212,.12);color:var(--cyan);padding:4px 12px;border-radius:20px;border:1px solid rgba(6,182,212,.3)">3 NJ Counties</span>
-          </div>
-        </div></div>
+      <div class="card" style="overflow:visible"><div class="card-header"><span>🗺️</span><div class="card-title">Territory Map</div></div>
+        <div class="card-body" style="overflow:visible;padding:0"><div id="coverage-map-container" style="height:340px;border-radius:0 0 14px 14px;background:var(--navy-light);width:100%;display:block"></div></div>
       </div>
       <div class="card"><div class="card-header"><span>📍</span><div class="card-title">County Status</div></div>
         <div class="card-body" style="padding:16px 20px">
@@ -1359,6 +2212,65 @@ function pgCoverage() {
       </div>
     </div>
   </div>`;
+}
+
+// ─── COVERAGE MAP INIT ──────────────────────────────────────────
+// Uses Maps Embed API (iframe) — works on all devices including iOS Safari.
+// The JS API approach fails on mobile inside position:fixed/overflow:auto containers.
+function initCoverageMap() {
+  const container = document.getElementById('coverage-map-container');
+  const alertEl   = document.getElementById('coverage-map-alert');
+  if (!container) return;
+
+  if (!settings.googleMapsKey) {
+    container.innerHTML = `
+      <div style="min-height:240px;height:100%;display:flex;align-items:center;justify-content:center;
+                  flex-direction:column;gap:12px;color:var(--gray);
+                  border:2px dashed var(--navy-border);border-radius:0 0 14px 14px;box-sizing:border-box;padding:20px">
+        <div style="font-size:2.5rem">🗺️</div>
+        <div style="font-weight:600;color:var(--white)">Coverage Map</div>
+        <div style="font-size:.82rem;text-align:center;max-width:280px;line-height:1.5">
+          Enter your Google Maps API key in
+          <span style="cursor:pointer;color:var(--blue-bright);text-decoration:underline"
+                onclick="navTo('settings')">Settings → Integrations</span>
+          to activate the interactive map
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+          <span style="font-size:.75rem;background:rgba(37,99,235,.15);color:var(--blue-bright);padding:4px 12px;border-radius:20px;border:1px solid rgba(37,99,235,.3)">5 PA Counties</span>
+          <span style="font-size:.75rem;background:rgba(6,182,212,.12);color:var(--cyan);padding:4px 12px;border-radius:20px;border:1px solid rgba(6,182,212,.3)">3 NJ Counties</span>
+        </div>
+      </div>`;
+    if (alertEl) alertEl.innerHTML = `<div class="alert-box warn">⚠️ <div><strong>No Google Maps API key set.</strong> <span style="cursor:pointer;text-decoration:underline" onclick="navTo('settings')">Add it in Settings → Integrations</span> then return here. Enable <strong>Maps Embed API</strong> in Google Cloud Console.</div></div>`;
+    return;
+  }
+
+  if (alertEl) alertEl.innerHTML = `<div class="alert-box info">🗺️ <div>Showing 8-county PA/NJ service territory. If the map shows an error, enable <strong>Maps Embed API</strong> in your Google Cloud Console and ensure billing is active.</div></div>`;
+
+  // Build county marker pins for the embed URL
+  const markers = [
+    { lat:39.9526, lng:-75.1652, label:'PHL' },
+    { lat:40.2115, lng:-75.3874, label:'MON' },
+    { lat:40.3451, lng:-75.0619, label:'BUC' },
+    { lat:39.9735, lng:-75.7407, label:'CHE' },
+    { lat:39.9068, lng:-75.4093, label:'DEL' },
+    { lat:40.0110, lng:-74.7143, label:'BUR' },
+    { lat:39.8007, lng:-74.9636, label:'CAM' },
+    { lat:39.7090, lng:-75.1493, label:'GLO' },
+  ];
+  const markerParams = markers.map(m => `markers=color:blue%7Clabel:${m.label}%7C${m.lat},${m.lng}`).join('&');
+  const src = `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(settings.googleMapsKey)}&center=40.05,-75.15&zoom=9&maptype=roadmap`;
+
+  container.innerHTML = `
+    <iframe
+      src="${src}"
+      width="100%"
+      height="100%"
+      style="border:0;display:block;width:100%;height:100%;min-height:280px;border-radius:0 0 14px 14px"
+      allowfullscreen
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      title="ExpertEV Coverage Territory">
+    </iframe>`;
 }
 
 // ─── SMS TEMPLATES ──────────────────────────────────────────────
@@ -1493,7 +2405,7 @@ function pgSettings() {
           </div>
           <div class="form-group">
             <label class="form-label">Google Maps API Key</label>
-            <input class="form-input" id="s-gmap" value="" placeholder="AIzaSy...">
+            <input class="form-input" id="s-gmap" value="${settings.googleMapsKey||''}" placeholder="AIzaSy...">
             <div style="font-size:.75rem;color:var(--gray);margin-top:4px">For interactive coverage map. Optional — get from Google Cloud Console.</div>
           </div>
         </div>
@@ -1536,11 +2448,11 @@ function pgSettings() {
         </div>
         <div class="setting-row">
           <div class="setting-info"><div class="setting-name">Follow-up alerts (10 min / 2 hr)</div><div class="setting-desc">Alert admin if a contractor does not contact a lead within 10 minutes (and again at 2 hours)</div></div>
-          <div class="toggle on" id="toggle-followup"></div>
+          <div class="toggle ${settings.followUpAlerts?'on':''}" id="toggle-followup" onclick="toggleSetting('followUpAlerts','toggle-followup')"></div>
         </div>
         <div class="setting-row">
           <div class="setting-info"><div class="setting-name">Post-completion review requests</div><div class="setting-desc">Automatically send a review request SMS to customers when job status changes to Completed</div></div>
-          <div class="toggle" id="toggle-review"></div>
+          <div class="toggle ${settings.reviewRequests?'on':''}" id="toggle-review" onclick="toggleSetting('reviewRequests','toggle-review')"></div>
         </div>
       </div>
     </div>
@@ -1549,7 +2461,7 @@ function pgSettings() {
       <div class="card-header"><span>🛡️</span><div class="card-title">Security & Infrastructure</div></div>
       <div class="card-body" style="padding:8px 22px">
         ${[
-          ['Rate Limiting','Prevents spam form submissions — max 3 requests per IP per hour','✅ Active','var(--green)'],
+          ['Rate Limiting','Prevents spam form submissions — max 3 requests per browser per 10 minutes','✅ Active','var(--green)'],
           ['Spam Lead Filtering','Keyword + bot detection on form submissions via Formspree CAPTCHA','✅ Active','var(--green)'],
           ['Phone Validation','Client-side phone format validation on all quote forms','✅ Active','var(--green)'],
           ['Email Validation','Email format checked before form submission','✅ Active','var(--green)'],
@@ -1568,15 +2480,18 @@ function pgSettings() {
 function toggleSetting(key, toggleId) {
   settings[key] = !settings[key];
   document.getElementById(toggleId).classList.toggle('on', settings[key]);
+  persist();
 }
 function saveSettings() {
   settings.adminEmail  = document.getElementById('s-email')?.value      || settings.adminEmail;
   settings.paPhone     = document.getElementById('s-paphone')?.value    || settings.paPhone;
   settings.njPhone     = document.getElementById('s-njphone')?.value    || settings.njPhone;
-  settings.formspreeId = document.getElementById('s-formspree')?.value  || settings.formspreeId;
+  settings.formspreeId   = document.getElementById('s-formspree')?.value  || settings.formspreeId;
+  settings.googleMapsKey = (document.getElementById('s-gmap')?.value ?? '').trim();
   settings.commissionPct = parseInt(document.getElementById('s-commission')?.value) || settings.commissionPct;
-  settings.leadFee     = parseInt(document.getElementById('s-leadfee')?.value)     || settings.leadFee;
+  settings.leadFee       = parseInt(document.getElementById('s-leadfee')?.value)    || settings.leadFee;
   persist();
+  if (isSupabaseReady()) sbUpdateSettings(settings).catch(e => console.warn('[DB] updateSettings:', e.message));
   showToast('Settings saved!');
 }
 
@@ -1594,7 +2509,6 @@ function pgMyLeads() {
   </div>`;
 }
 
-let _myLeadsView = 'cards'; // 'cards' | 'table'
 function toggleMyLeadsView() {
   _myLeadsView = _myLeadsView === 'cards' ? 'table' : 'cards';
   renderMyLeads();
@@ -1741,7 +2655,7 @@ function pgMyRevenue() {
   const reviewd    = done.filter(l=>l.review);
   const avgRating  = reviewd.length ? (reviewd.reduce((s,l)=>s+l.review.rating,0)/reviewd.length).toFixed(1) : '—';
   return `<div class="page" id="page-my-revenue">
-    <div class="page-header"><div><h1>Performance Analytics</h1><p>Red Flow Electric — your stats</p></div></div>
+    <div class="page-header"><div><h1>Performance Analytics</h1><p>${sanitizeHTML((currentContractor && (currentContractor.companyName || currentContractor.name)) || currentUser.name || 'Your')} — your stats</p></div></div>
     <div class="stats-grid">
       <div class="stat-card blue"><div class="stat-icon">⚡</div><div class="stat-value blue">${myLeads.length}</div><div class="stat-label">Leads Received</div></div>
       <div class="stat-card yellow"><div class="stat-icon">📞</div><div class="stat-value yellow">${contacted.length}</div><div class="stat-label">Leads Contacted</div></div>
@@ -1768,22 +2682,33 @@ function pgMyRevenue() {
 }
 
 function pgMyProfile() {
-  const c = CONTRACTORS[0];
+  const c = currentContractor || _getContractors().find(x => x.id === currentUser?.id) || _getContractors()[0] || {};
+  const counties = Array.isArray(c.counties) ? c.counties : [];
   return `<div class="page" id="page-my-profile">
-    <div class="page-header"><div><h1>My Profile</h1><p>Red Flow Electric — Partner Account</p></div></div>
+    <div class="page-header"><div><h1>My Profile</h1><p>${sanitizeHTML(c.companyName || c.name || 'Contractor')} — Partner Account</p></div></div>
     <div class="grid-2">
       <div class="card"><div class="card-header"><span>🏢</span><div class="card-title">Company Info</div></div><div class="card-body">
-        <div class="detail-row"><div class="detail-label">Company</div><div class="detail-value" style="font-weight:600">${c.name}</div></div>
-        <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${c.contact}</div></div>
-        <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value">${c.phone}</div></div>
-        <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value">${c.email}</div></div>
-        <div class="detail-row"><div class="detail-label">License</div><div class="detail-value mono">${c.license}</div></div>
+        <div class="detail-row"><div class="detail-label">Company</div><div class="detail-value" style="font-weight:600">${sanitizeHTML(c.companyName || c.name || '—')}</div></div>
+        <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${sanitizeHTML(c.contactName || c.contact || '—')}</div></div>
+        <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value">${sanitizeHTML(c.phone || '—')}</div></div>
+        <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value">${sanitizeHTML(c.email || currentUser?.email || '—')}</div></div>
+        <div class="detail-row"><div class="detail-label">License</div><div class="detail-value mono">${sanitizeHTML(c.license || '—')}</div></div>
         <div class="detail-row"><div class="detail-label">Status</div><div class="detail-value"><span class="badge badge-completed">Active Partner</span></div></div>
       </div></div>
       <div class="card"><div class="card-header"><span>📍</span><div class="card-title">Service Territory</div></div><div class="card-body">
-        ${c.counties.map(county=>`<div class="county-row"><div class="county-name">${county}</div><div style="flex:1"></div><span class="badge badge-completed" style="font-size:.68rem">Covered</span></div>`).join('')}
+        ${counties.length === 0
+          ? `<div class="empty-state" style="padding:20px"><div class="empty-state-icon">📍</div><p>No service territory set</p></div>`
+          : counties.map(county=>`<div class="county-row"><div class="county-name">${sanitizeHTML(county)}</div><div style="flex:1"></div><span class="badge badge-completed" style="font-size:.68rem">Covered</span></div>`).join('')}
       </div></div>
     </div>
+    <div class="card" style="margin-top:16px"><div class="card-header"><span>🔒</span><div class="card-title">Change Password</div></div><div class="card-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">New Password</label><input class="form-input" type="password" id="cp-new" placeholder="Min 8 characters" /></div>
+        <div class="form-group"><label class="form-label">Confirm Password</label><input class="form-input" type="password" id="cp-confirm" placeholder="Repeat new password" /></div>
+      </div>
+      <div id="cp-error" style="display:none;color:var(--red);font-size:.82rem;margin-bottom:8px"></div>
+      <button class="btn btn-primary" onclick="doChangePassword()">Update Password</button>
+    </div></div>
   </div>`;
 }
 
@@ -1793,7 +2718,7 @@ function pgMyProfile() {
 function openLeadDetail(id) {
   const l = leads.find(x => x.id === id);
   if (!l) return;
-  const cName = l.contractor ? (CONTRACTORS.find(c=>c.id===l.contractor)||{}).name || 'Unassigned' : 'Unassigned';
+  const cName = l.contractor ? (_getContractors().find(c=>c.id===l.contractor)||{}).name || 'Unassigned' : 'Unassigned';
   document.getElementById('modal').classList.toggle('modal-lg', true);
   document.getElementById('modal-title').textContent = `${l.id} — ${l.name}`;
   const _ji = getJobIntelligence(l);
@@ -1802,7 +2727,7 @@ function openLeadDetail(id) {
       <button class="tab-btn active" onclick="switchTab(event,'tab-intel')">⚡ Job Intelligence</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-details')">Details</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-notes')">Notes (${l.notes.length})</button>
-      <button class="tab-btn" onclick="switchTab(event,'tab-actions')">Update Status</button>
+      <button class="tab-btn" onclick="switchTab(event,'tab-actions')">✏️ Edit Lead</button>
     </div>
     <div class="tab-panel active" id="tab-intel">
       <!-- Profit potential banner -->
@@ -1904,6 +2829,7 @@ function openLeadDetail(id) {
           ${l.contactedAt ? `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--green)">${l.contactedAt}</div></div>` : `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--red)">Not yet</div></div>`}
         </div>
       </div>
+      ${(()=>{ const cn = l.notes.find(n => n.author === 'Customer'); return cn ? `<div style="background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:8px;padding:12px 16px;margin-top:12px"><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blue-bright);margin-bottom:6px">Customer Notes</div><div style="font-size:.88rem;color:var(--silver);line-height:1.6">${sanitizeHTML(cn.text)}</div></div>` : ''; })()}
       ${l.review ? `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px 16px;margin-top:12px"><div style="font-size:.72rem;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Customer Review</div><div style="color:var(--yellow)">${'★'.repeat(l.review.rating||5)}${'☆'.repeat(5-(l.review.rating||5))} &nbsp;<span style="font-size:.8rem;color:var(--gray)">${l.review.rating||5}/5</span></div><div style="font-size:.88rem;color:var(--silver);margin-top:4px">"${sanitizeHTML(l.review.text)}"</div><div style="font-size:.75rem;color:var(--gray);margin-top:4px">${l.review.date}</div></div>` : (l.status === 'completed' ? `<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="openReviewModal('${l.id}')">📩 Request Customer Review</button></div>` : '')}
     </div>
     <div class="tab-panel" id="tab-notes">
@@ -1917,22 +2843,49 @@ function openLeadDetail(id) {
       </div>
     </div>
     <div class="tab-panel" id="tab-actions">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Customer Name</label><input class="form-input" id="medit-name" value="${sanitizeHTML(l.name)}"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="medit-phone" value="${sanitizeHTML(l.phone)}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="medit-email" value="${sanitizeHTML(l.email)}"></div>
+        <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="medit-address" value="${sanitizeHTML(l.address)}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">County</label>
+          <select class="form-input" id="medit-county">
+            ${['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'].map(co=>`<option value="${co}" ${l.county===co?'selected':''}>${co}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">State</label>
+          <select class="form-input" id="medit-state">
+            <option value="PA" ${l.state==='PA'?'selected':''}>Pennsylvania</option>
+            <option value="NJ" ${l.state==='NJ'?'selected':''}>New Jersey</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Description / Notes</label>
+        <textarea class="form-input" id="medit-desc" rows="3" placeholder="Update customer notes or description...">${sanitizeHTML((l.notes.find(n=>n.author==='Customer')?.text)||'')}</textarea>
+      </div>
+      <div style="border-top:1px solid rgba(30,45,74,.6);margin:16px 0 12px;padding-top:4px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);font-weight:700">Status & Assignment</div>
       <div class="form-group"><label class="form-label">Status</label>
         <select class="form-input" id="mstatus">
           ${[['new','New Lead'],['assigned','Assigned'],['contacted','Contacted'],['scheduled','Est. Scheduled'],['quote-sent','Quote Sent'],['completed','Job Won'],['lost','Job Lost']].map(([v,lbl])=>`<option value="${v}" ${l.status===v?'selected':''}>${lbl}</option>`).join('')}
         </select>
       </div>
-      ${currentUser.role==='admin'?`<div class="form-group"><label class="form-label">Assign Contractor</label>
-        <select class="form-input" id="mcontractor">
-          <option value="">Unassigned</option>
-          ${CONTRACTORS.map(c=>`<option value="${c.id}" ${l.contractor===c.id?'selected':''}>${c.name}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Priority</label>
-        <select class="form-input" id="mpriority">
-          <option value="normal" ${l.priority==='normal'?'selected':''}>Normal</option>
-          <option value="high" ${l.priority==='high'?'selected':''}>High Priority</option>
-        </select>
+      ${currentUser.role==='admin'?`<div class="form-row">
+        <div class="form-group"><label class="form-label">Assign Contractor</label>
+          <select class="form-input" id="mcontractor">
+            <option value="">Unassigned</option>
+            ${_getContractors().map(c=>`<option value="${c.id}" ${l.contractor===c.id?'selected':''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Priority</label>
+          <select class="form-input" id="mpriority">
+            <option value="normal" ${l.priority==='normal'?'selected':''}>Normal</option>
+            <option value="high" ${l.priority==='high'?'selected':''}>High Priority</option>
+          </select>
+        </div>
       </div>`:''}
     </div>`;
   document.getElementById('modal-footer').innerHTML = `
@@ -1962,40 +2915,107 @@ function submitNote(id) {
 
 function addNote(id, author, text) {
   const l = leads.find(x => x.id === id);
-  if (l) { l.notes.push({ author, text, time: 'Just now' }); persist(); }
+  if (l) {
+    l.notes.push({ author, text, time: 'Just now' });
+    persist();
+    if (isSupabaseReady()) sbAddNote(id, author, text).catch(e => console.warn('[DB] addNote:', e.message));
+  }
 }
 
 function saveModal(id) {
   const l = leads.find(x => x.id === id);
   if (!l) return;
+  const prevStatus = l.status;
+
+  // ── Editable lead fields ──
+  const nameEl = document.getElementById('medit-name');
+  if (nameEl?.value.trim()) l.name = sanitizeHTML(nameEl.value.trim());
+  const phoneEl = document.getElementById('medit-phone');
+  if (phoneEl) l.phone = sanitizeHTML(phoneEl.value.trim());
+  const emailEl = document.getElementById('medit-email');
+  if (emailEl) l.email = sanitizeHTML(emailEl.value.trim());
+  const addrEl = document.getElementById('medit-address');
+  if (addrEl) l.address = sanitizeHTML(addrEl.value.trim());
+  const countyEl = document.getElementById('medit-county');
+  if (countyEl) l.county = countyEl.value;
+  const stateEl = document.getElementById('medit-state');
+  if (stateEl) l.state = stateEl.value;
+
+  // Update or add Customer note
+  const descEl = document.getElementById('medit-desc');
+  if (descEl) {
+    const newDesc = descEl.value.trim();
+    const existing = l.notes.find(n => n.author === 'Customer');
+    if (newDesc) {
+      if (existing) { existing.text = sanitizeHTML(newDesc); }
+      else { l.notes.unshift({ author:'Customer', text: sanitizeHTML(newDesc), time:'Edited' }); }
+    }
+  }
+
+  // ── Status / assignment ──
   const s = document.getElementById('mstatus');
-  if (s) { const prev = l.status; l.status = s.value; if (s.value === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+  if (s) { l.status = s.value; if (s.value === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
   const c = document.getElementById('mcontractor');
-  if (c) { l.contractor = c.value || null; if (c.value) addNote(id, 'Admin', `Assigned to ${(CONTRACTORS.find(x=>x.id===c.value)||{}).name}.`); }
+  if (c) { l.contractor = c.value || null; if (c.value) addNote(id, 'Admin', `Assigned to ${(_getContractors().find(x=>x.id===c.value)||{}).name}.`); }
   const p = document.getElementById('mpriority');
   if (p) l.priority = p.value;
+  if (l.status === 'completed' && prevStatus !== 'completed') _onLeadCompleted(l);
+
   closeModalDirect();
   if (document.getElementById('page-all-leads')?.classList.contains('active'))  renderLeadsTable();
   if (document.getElementById('page-assign')?.classList.contains('active'))     renderAssignTable();
   if (document.getElementById('page-my-leads')?.classList.contains('active'))   renderMyLeads();
   buildSidebar();
+  refreshAdminDashboard();
   persist();
+  if (isSupabaseReady()) {
+    sbUpdateLead(id, {
+      name: l.name, phone: l.phone, email: l.email, address: l.address,
+      county: l.county, state: l.state,
+      status: l.status, contractor_id: l.contractor || null, priority: l.priority,
+    }).then(r => {
+      if (!r) {
+        console.error('[DB]', JSON.stringify({ step: 'lead_update', lead_id: id, result: 'failure', error: 'updateLead returned null — likely RLS policy blocking admin update' }));
+        showToast('⚠ Lead updated locally — database sync failed. Check console.');
+      }
+    }).catch(e => {
+      console.error('[DB]', JSON.stringify({ step: 'lead_update', lead_id: id, error: e.message }));
+      showToast('⚠ Lead updated locally — database error. Check console.');
+    });
+  }
   showToast('Lead updated');
 }
 
 function upd(id, status) {
   const l = leads.find(x => x.id === id);
   if (l) {
+    const prev = l.status;
     l.status = status;
     if (status === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     addNote(id, currentUser.name, `Status changed to ${cap(status)}.`);
+    if (status === 'completed' && prev !== 'completed') _onLeadCompleted(l);
   }
   /* Refresh whichever view is currently active */
   if (document.getElementById('page-my-leads')?.classList.contains('active'))  renderMyLeads();
   if (document.getElementById('page-all-leads')?.classList.contains('active')) renderLeadsTable();
   buildSidebar();
+  refreshAdminDashboard();
   persist();
+  if (isSupabaseReady()) {
+    sbUpdateLeadStatus(id, status).then(r => {
+      if (!r) console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, status, result: 'failure', error: 'updateLeadStatus returned null — likely RLS policy' }));
+    }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, error: e.message })));
+  }
   showToast('Status updated → ' + cap(status));
+}
+
+/* Fired once when any lead transitions into 'completed' status.
+   Unconditional: always notifies. Review request prompt is separate. */
+function _onLeadCompleted(l) {
+  addNotification(`✅ <strong>Job Won — ${sanitizeHTML(l.name)}</strong> · $${l.value.toLocaleString()} · ${sanitizeHTML(l.county)}`);
+  if (settings.reviewRequests) {
+    addNotification(`📩 <strong>Review request queued</strong> for ${sanitizeHTML(l.name)} — open lead to send`);
+  }
 }
 
 // ─── ADD LEAD MODAL ─────────────────────────────────────────────
@@ -2049,8 +3069,14 @@ function saveNewLead() {
   newLead.difficulty     = ji.difficulty;
   leads.push(newLead);
   persist();
+  if (isSupabaseReady()) {
+    sbCreateLead(newLead).then(r => {
+      if (!r) console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, result: 'failure', error: 'createLead returned null — likely RLS policy. Run schema_v3_rls_fix.sql.' }));
+    }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, error: e.message })));
+  }
   closeModalDirect();
   renderLeadsTable(); buildSidebar();
+  refreshAdminDashboard();
   addNotification(`New lead added manually: <strong>${sanitizeHTML(name)}</strong>`);
   showToast('Lead added — ' + name);
 }
@@ -2079,6 +3105,15 @@ function clearNotifs() { notifications=[]; renderNotifList(); persist(); showToa
 function addNotification(text) {
   notifications.unshift({id:Date.now(),text,time:'Just now',read:false});
   renderNotifDot();
+  // Only write to Supabase when admin is signed in.
+  // Public (anon) callers have no notifications INSERT policy — any attempt
+  // produces a 401 that masks whether the lead insert itself succeeded or failed.
+  if (isSupabaseReady() && currentUser?.role === 'admin') {
+    console.log('[NOTIFS] Writing to DB (admin session)');
+    sbAddNotification(text).catch(e => console.warn('[NOTIFS] DB write failed:', e.message));
+  } else {
+    console.log('[NOTIFS] Skipping DB write | role:', currentUser?.role ?? 'anon/none');
+  }
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('#notif-btn') && !e.target.closest('#notif-panel')) {
@@ -2116,7 +3151,7 @@ function exportCSV(filter) {
   const rows = data.map(l => [
     l.id, l.name, l.phone, l.email, l.address, l.county, l.state,
     l.service, l.value, l.status,
-    l.contractor ? (CONTRACTORS.find(c=>c.id===l.contractor)||{}).name||'' : '',
+    l.contractor ? (_getContractors().find(c=>c.id===l.contractor)||{}).name||'' : '',
     l.created
   ]);
   const csv = [headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -2174,7 +3209,7 @@ function openQualityReview(lid) {
     <div class="form-group"><label class="form-label">Override Contractor Assignment</label>
       <select class="form-input" id="qa-contractor">
         <option value="">— Keep current —</option>
-        ${CONTRACTORS.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
+        ${_getContractors().map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
       </select></div>`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
      <button class="btn btn-primary" onclick="saveQualityReview('${lid}')">Save Review</button>`);
@@ -2205,20 +3240,6 @@ function openModalWith(title, body, footer) {
 function closeModal(e)  { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
 function closeModalDirect() { document.getElementById('modal-overlay').classList.remove('open'); }
 
-// ═══════════════════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════════════════
-const STATUS_LABELS = {new:'New Lead',assigned:'Assigned',contacted:'Contacted',scheduled:'Est. Scheduled','quote-sent':'Quote Sent',completed:'Job Won',lost:'Job Lost'};
-function cap(s) { return STATUS_LABELS[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : s); }
-function showToast(msg) {
-  document.querySelectorAll('.toast').forEach(t=>t.remove());
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy-mid);border:1px solid var(--blue);color:var(--white);padding:12px 20px;border-radius:10px;font-size:.88rem;z-index:9999;box-shadow:0 8px 20px rgba(0,0,0,.4);animation:fadeInUp .2s';
-  t.textContent = '✅ ' + msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 2800);
-}
 
 // Dashboard initialised lazily when portal opens (see openDashboard)
 
@@ -2246,18 +3267,20 @@ function toggleFaq(btn) {
 ════════════════════════════════════════════════ */
 /* Portal opened via nav button */
 
-let _dashInited = false;
 function openDashboard() {
   const overlay = document.getElementById('dash-overlay');
   if (!overlay) return;
+  // Record that the user explicitly entered the portal so session restore
+  // can auto-open it on refresh. Cleared in closeDashboardOverlay / doLogout.
+  sessionStorage.setItem('ev_portal_open', '1');
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   if (!_dashInited) {
     _dashInited = true;
     // Small delay to let overlay render before JS reads layout
     setTimeout(() => {
-      fillDemo('admin');
       renderNotifList();
+      _setupAuthStateChange();
     }, 50);
   }
 }
@@ -2267,11 +3290,16 @@ function closeDashboardOverlay() {
   if (overlay) {
     overlay.classList.remove('open');
     document.body.style.overflow = '';
+    // Clear portal intent — next page visit will show the public site, not the dashboard.
+    sessionStorage.removeItem('ev_portal_open');
     document.getElementById('page-home')?.classList.add('active');
+    // Tear down realtime before clearing state
+    _teardownRealtimeSubscriptions();
     // Log out when closing so dashboard resets if re-opened
-    if (typeof doLogout === 'function' && typeof currentUser !== 'undefined' && currentUser) {
+    if (typeof currentUser !== 'undefined' && currentUser) {
       // silently reset state without showing login screen flicker
       currentUser = null;
+      currentContractor = null;
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app').style.display = 'none';
     }

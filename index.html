@@ -85,11 +85,11 @@
           </div>
           <div class="cred-item">
             <div class="cred-icon">📋</div>
-            <div><div class="cred-text">Permits Handled</div><div class="cred-sub">We file everything</div></div>
+            <div><div class="cred-text">Permits Handled</div><div class="cred-sub">Coordinated every install</div></div>
           </div>
           <div class="cred-item">
             <div class="cred-icon">💰</div>
-            <div><div class="cred-text">Rebates Filed</div><div class="cred-sub">Avg $500–$1,500 back</div></div>
+            <div><div class="cred-text">Rebate Guidance</div><div class="cred-sub">PECO · PSE&amp;G · Federal</div></div>
           </div>
         </div>
 
@@ -161,17 +161,6 @@
               <option>Other / Deciding soon</option>
             </select>
           </div>
-          <div class="ff">
-            <label>Charger Location</label>
-            <select name="charger_location">
-              <option value="">Where will the charger go?</option>
-              <option>Attached garage</option>
-              <option>Detached garage</option>
-              <option>Outdoor / driveway</option>
-              <option>Townhome / condo</option>
-              <option>Not sure yet</option>
-            </select>
-          </div>
           <div class="ff-row">
             <div class="ff">
               <label>Electrical Panel Size</label>
@@ -217,11 +206,8 @@
               <option value="not_purchased">Not purchased yet</option>
             </select>
           </div>
-          <div class="ff">
-            <label>Panel Photo <span style="color:var(--mid-grey);font-size:0.75em;text-transform:none;letter-spacing:0;font-family:'Exo 2',sans-serif">(optional)</span></label>
-            <input type="file" name="panel_photo" accept="image/*" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);color:var(--silver);font-family:'Exo 2',sans-serif;font-size:0.82rem;padding:9px 13px;width:100%;border-radius:4px;cursor:pointer;">
-            <div style="font-size:0.7rem;color:var(--mid-grey);margin-top:5px;line-height:1.55;">Uploading a panel photo helps electricians determine if your home is ready for Level 2 charging and speeds up estimates.</div>
-          </div>
+          <!-- Panel Photo field removed temporarily — file storage not yet implemented.
+               Will be restored in Phase 4 (Supabase Storage). -->
           <div class="ff"><label>Notes (optional)</label><textarea name="notes" placeholder="Any additional details or questions..."></textarea></div>
           <input type="hidden" name="lead_source" id="main-lead-source" value="Direct">
           <!-- Honeypot: hidden from humans, bots fill it automatically -->
@@ -271,7 +257,7 @@
       <div class="trust-divider"></div>
       <div class="trust-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        Permits Filed For You
+        Permits Coordinated Per Install
       </div>
       <div class="trust-divider"></div>
       <div class="trust-item">
@@ -292,29 +278,29 @@
   <section class="cro-section" id="cro-cost">
     <div class="wrap">
       <div class="section-eyebrow">Transparent Pricing</div>
-      <h2 class="section-h2">Typical EV Charger <span>Installation Cost</span></h2>
-      <p class="section-sub">Every home is different — here's what most homeowners pay based on their electrical setup.</p>
+      <h2 class="section-h2">What You'll Actually <span>Pay — and Why</span></h2>
+      <p class="section-sub">Most Level 2 installs in our service area fall between $900 and $1,400. Here's what separates those two numbers — and what's always included.</p>
       <div class="cost-grid">
         <div class="cost-card basic">
-          <div class="cost-card-tier">Tier 1</div>
-          <div class="cost-card-label">Basic Installation</div>
-          <div class="cost-card-range">$900 – $1,400</div>
-          <div class="cost-card-desc">200-amp panel with available breaker space, charger within 10–25 ft. Most straightforward installs fall here.</div>
+          <div class="cost-card-tier">Labor Only</div>
+          <div class="cost-card-label">You Already Have the Charger</div>
+          <div class="cost-card-range">$900 – $1,100</div>
+          <div class="cost-card-desc">You've purchased your charger, your panel has available capacity, and the install location is straightforward. We handle mounting, wiring, circuit connection, and testing.</div>
         </div>
         <div class="cost-card moderate">
-          <div class="cost-card-tier">Tier 2</div>
-          <div class="cost-card-label">Moderate Installation</div>
-          <div class="cost-card-range">$1,400 – $2,200</div>
-          <div class="cost-card-desc">Longer wiring runs (25–50 ft), conduit through walls, or dedicated circuit additions. Still no panel work required.</div>
+          <div class="cost-card-tier">All-In Install</div>
+          <div class="cost-card-label">The Complete Package</div>
+          <div class="cost-card-range">$1,100 – $1,400</div>
+          <div class="cost-card-desc">Includes charger installation, dedicated 240V breaker, all wiring and conduit, mounting hardware, full circuit test, and permit coordination where required. One call, one visit, done.</div>
         </div>
         <div class="cost-card upgrade">
-          <div class="cost-card-tier">Tier 3</div>
-          <div class="cost-card-label">Panel Upgrade Installation</div>
-          <div class="cost-card-range">$2,500 – $6,000+</div>
-          <div class="cost-card-desc">100-amp panel requiring upgrade to 200-amp service. Includes permit, utility coordination, and full installation.</div>
+          <div class="cost-card-tier">Panel Upgrade</div>
+          <div class="cost-card-label">Older Home, 100A Panel</div>
+          <div class="cost-card-range">$2,500 – $4,500+</div>
+          <div class="cost-card-desc">Homes with 60A or 100A panels — common in older Philadelphia rowhouses and South Jersey suburbs — may need a service upgrade before installation. We assess this first and always quote before starting.</div>
         </div>
       </div>
-      <p class="cost-disclaimer">Final pricing depends on electrical panel capacity, wiring distance, and installation complexity. A licensed electrician will provide a firm written quote before any work begins.</p>
+      <p class="cost-disclaimer">What we quote is what you pay. Pricing is affected by panel capacity, wiring distance, and whether outdoor weatherproofing is needed — we explain each factor upfront. PA customers may qualify for PECO utility incentives; NJ customers may qualify for PSE&G programs — eligibility and amounts vary. The federal Alternative Fuel Vehicle Refueling Property Credit may also apply: up to 30% of qualifying costs (up to $1,000 residential), available for installations placed in service before January 1, 2033, subject to census tract eligibility and your individual tax situation. Ask us for guidance, and confirm with a tax advisor.</p>
     </div>
   </section>
 
@@ -500,7 +486,7 @@
             <div class="authority-badge-icon">💰</div>
             <div>
               <div class="authority-badge-title">Rebate Assistance Included</div>
-              <div class="authority-badge-sub">We help you claim PECO, PSE&amp;G, and federal EV charger rebates — avg $500–$1,500 back</div>
+              <div class="authority-badge-sub">We guide you through PECO, PSE&amp;G, and federal incentive programs — eligibility and amounts vary</div>
             </div>
           </div>
         </div>
@@ -538,44 +524,44 @@
   <!-- WHY TRANSPARENT -->
   <section class="section" id="why-us">
     <div class="wrap">
-      <div class="section-eyebrow">Our Commitment to You</div>
-      <h2 class="section-h2">We're New. <span>We're Honest About It.</span></h2>
-      <p class="section-sub">Most lead-gen sites fake reviews and inflate numbers to look established. We're not doing that. Here's exactly what we offer — no fluff.</p>
+      <div class="section-eyebrow">Why Choose Us</div>
+      <h2 class="section-h2">Built Local. <span>Earning It the Right Way.</span></h2>
+      <p class="section-sub">We're not a national franchise with a call center. We're a locally focused operation — and that means every install, every permit, every customer actually matters to us.</p>
       <div class="transparency-grid">
         <div class="trans-card">
           <div class="trans-icon">📜</div>
-          <h3>Every Contractor is Licensed</h3>
-          <p>We don't send random handymen. Every electrician in our network carries a current PA or NJ electrical license, general liability insurance, and has passed our vetting process before they ever see a lead.</p>
+          <h3>Licensed &amp; Insured, Every Time</h3>
+          <p>Every electrician we work with carries a current PA or NJ electrical license and full general liability insurance. We don't send handymen. Powered by Red Flow Electric — our anchor partner and the standard we hold everyone to.</p>
         </div>
         <div class="trans-card">
           <div class="trans-icon">💵</div>
-          <h3>Transparent, Upfront Pricing</h3>
-          <p>You'll get a firm written quote before any work begins. Our contractors don't do surprise bills. The price we quote is the price you pay — unless you change the scope of work.</p>
+          <h3>Quoted Before We Start, Period</h3>
+          <p>You'll receive a firm written quote before any work begins. What we quote is what you pay — no surprise line items, no "we noticed something extra while we were there." Scope changes are discussed with you first.</p>
         </div>
         <div class="trans-card">
           <div class="trans-icon">📋</div>
-          <h3>Permits Are Not Optional</h3>
-          <p>We require every installation to be permitted. No exceptions. An unpermitted EV charger can void your home insurance and cause problems at resale. We won't let that happen to you.</p>
+          <h3>Permits Handled, Not Optional</h3>
+          <p>We pull every permit and schedule inspections where required. An unpermitted EV charger can void your homeowner's insurance and create complications when you sell. We won't let you walk into that problem.</p>
         </div>
         <div class="trans-card">
-          <div class="trans-icon">🔍</div>
-          <h3>Free Assessment, No Pressure</h3>
-          <p>Your first call is with a licensed electrician — not a salesperson. They'll assess your home's needs honestly. If your panel is fine as-is, we'll tell you. We don't upsell what you don't need.</p>
+          <div class="trans-icon">⚡</div>
+          <h3>2-Hour Response, Local People</h3>
+          <p>When you submit a quote request during business hours, you hear back within 2 hours — from a person, not an automated sequence. No call centers. No offshore routing. Local team, local knowledge.</p>
         </div>
         <div class="trans-card">
           <div class="trans-icon">⭐</div>
-          <h3>Be Our First Reviews</h3>
-          <p>We're building our reputation from zero — which means your experience matters more to us than it would to an established company. We're earning every review and every referral.</p>
+          <h3>Your Review Matters More to Us</h3>
+          <p>We're building this reputation from job one. That means we have more motivation than any established company to make sure you're genuinely happy. We don't have the luxury of a bad job — and honestly, we wouldn't want it.</p>
         </div>
         <div class="trans-card">
           <div class="trans-icon">🛡️</div>
-          <h3>1-Year Warranty, In Writing</h3>
-          <p>Every installation comes with a 1-year workmanship warranty. If something fails due to our work, we come back and fix it — no charge. You get this in writing before we start.</p>
+          <h3>1-Year Workmanship Warranty</h3>
+          <p>Every installation comes with a 1-year written workmanship warranty. If something fails due to our work, we return and fix it at no charge. You get this in writing before the job starts — not after.</p>
         </div>
       </div>
       <div class="honest-note" style="margin-top: 0;">
         <div class="honest-note-icon">💬</div>
-        <p><strong>A note from our founder:</strong> "I work in electrical sales and I know how this industry works. Most platforms farm leads and don't care what happens after. I'm building Expert EV Installers because I want homeowners to actually get a great install — permitted, rebated, and done right. Red Flow Electric is our anchor partner and the standard I hold every contractor to. We're new, but we're serious." — Expert EV Installers, Philadelphia PA</p>
+        <p><strong>A note from our founder:</strong> "I know how this industry works. Most platforms collect your info and don't care what happens next. I'm building Expert EV Installers because homeowners in this area deserve a proper install — permitted, rebated, and done right by someone accountable. Red Flow Electric is our anchor partner and the standard I hold every contractor to. We're newer than the big names, and that's exactly why we're more motivated." — Expert EV Installers, Philadelphia PA</p>
       </div>
     </div>
   </section>
@@ -609,7 +595,7 @@
           <div class="step-n">Step 04</div>
           <div class="step-icon-wrap">💰</div>
           <h3>Rebates + Charging</h3>
-          <p>We walk you through every available rebate and file the paperwork with you. Then you charge your EV every night for years.</p>
+          <p>We walk you through available utility and federal incentive programs so you know exactly what you may qualify for and how to apply. Then you charge every night for years.</p>
         </div>
       </div>
     </div>
@@ -662,21 +648,21 @@
     <div class="wrap">
       <div class="section-eyebrow">Big Savings</div>
       <h2 class="section-h2">Maximized Savings & <span class="gold">Rebate Support</span></h2>
-      <p class="section-sub">Most homeowners miss out on thousands because incentives change every few months. We don't just install your charger — we identify and file the paperwork to ensure you get every dollar available. Our customers average <strong>$500–$1,500 in total savings.</strong></p>
+      <p class="section-sub">Incentive programs change frequently and most homeowners don't know what's available. We walk you through the options — utility rebates, the federal tax credit, and manufacturer offers — so you know what you may qualify for and exactly how to apply.</p>
       <div class="rebates-layout">
         <div class="rebate-list">
           <div class="rebate-row">
             <div class="rebate-amt">Up to<br><span style="font-size:1.5rem">$1,500</span></div>
             <div>
               <h4>NJ Utility Credits</h4>
-              <p>PSE&amp;G and JCP&amp;L offer massive "Make-Ready" credits that cover the cost of your wiring, permits, and panel upgrades.</p>
+              <p>PSE&amp;G offers EV charging incentive programs for NJ customers in our service area. Program availability, eligibility, and amounts vary — we help you understand what's currently active and whether your installation may qualify.</p>
             </div>
           </div>
           <div class="rebate-row">
             <div class="rebate-amt">30<span class="rebate-pct">%</span></div>
             <div>
               <h4>Federal Tax Credit</h4>
-              <p>Receive a credit for 30% of your total project cost (up to $1,000). <strong>Note:</strong> This federal program is set to expire on June 30, 2026, and is location-dependent.</p>
+              <p>The federal Alternative Fuel Vehicle Refueling Property Credit (IRS Form 8911) may cover up to 30% of qualifying costs (up to $1,000 for residential installs) for installations placed in service before January 1, 2033. <strong>Important:</strong> eligibility depends on whether your property is in a qualifying census tract and your individual tax situation — confirm with a tax advisor before assuming you qualify.</p>
             </div>
           </div>
           <div class="rebate-row">
@@ -698,9 +684,9 @@
         <div class="rebate-total-card">
           <div class="rebate-total-label">Average Customer Savings</div>
           <div class="rebate-total-num">$500–$1,500</div>
-          <div class="rebate-total-sub">When we stack all available federal, utility, and manufacturer incentives — most customers save $500 to $1,500 on their total installation cost.</div>
+          <div class="rebate-total-sub">When federal, utility, and manufacturer incentives are stacked, many homeowners significantly reduce their net installation cost — eligibility and amounts vary by location and tax situation.</div>
           <div class="rebate-note">
-            <strong>We file everything for you.</strong> Most electricians don't mention rebates at all. We make sure you claim every dollar you're owed before we close the job.
+            <strong>We walk you through it.</strong> Most electricians don't mention rebates at all. We make sure you know what programs exist, whether you may qualify, and how to apply — before we close the job.
           </div>
           <a class="pill-btn charge" style="margin-top:20px;width:100%;justify-content:center;" onclick="focusForm()">Get My Quote + Rebate Estimate</a>
         </div>
@@ -753,8 +739,8 @@
         <div class="expect-item">
           <div class="expect-num">06</div>
           <div class="expect-content">
-            <h4>Rebate paperwork handed to you</h4>
-            <p>We hand you a completed rebate packet — filled out, with all required receipts and documentation. You submit it or we help you do it online. Most rebates arrive in 4–6 weeks.</p>
+            <h4>Rebate guidance before we close</h4>
+            <p>Before we wrap up, we walk you through the utility and federal incentive programs you may qualify for, explain what documentation you'll need, and point you to how to apply. Rebate timelines vary by program.</p>
           </div>
         </div>
       </div>
@@ -785,8 +771,8 @@
   <section class="section" id="counties">
     <div class="wrap">
       <div class="section-eyebrow">Where We Work</div>
-      <h2 class="section-h2">All <span>9 Counties</span> We Serve</h2>
-      <p class="section-sub">Dedicated electricians across Southeast PA and South Jersey — with specific knowledge of each county's permit requirements.</p>
+      <h2 class="section-h2">All <span>8 Counties</span> We Serve</h2>
+      <p class="section-sub">We work across 5 Pennsylvania counties and 3 South Jersey counties — and we know the permit requirements, utility programs, and local inspectors in each one.</p>
     </div>
     <div class="wrap-wide">
       <div class="county-grid">
@@ -887,49 +873,42 @@
     <div class="wrap">
       <div class="section-eyebrow">Questions Answered</div>
       <h2 class="section-h2">Frequently <span>Asked</span></h2>
-      <p class="section-sub">Real answers to the questions homeowners ask us most before booking.</p>
+      <p class="section-sub">Real answers to the questions homeowners in PA and NJ ask us most before booking.</p>
       <div class="faq-wrap">
         <div class="faq-item">
           <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">How much does EV charger installation cost in PA or NJ?</span>
+            <span class="faq-q-text">How much does it cost to install a Level 2 EV charger in Philadelphia or the surrounding Pennsylvania counties?</span>
             <div class="faq-plus">+</div>
           </button>
-          <div class="faq-answer"><div class="faq-answer-inner">A standard Level 2 installation in a home with adequate panel capacity runs $499–$900 including labor, materials, and permit. If your panel needs upgrading, total cost can be $1,800–$3,500 — but after the 30% federal credit and available utility incentives, many customers net below $500 all-in. We always give you a firm written quote before starting.</div></div>
+          <div class="faq-answer"><div class="faq-answer-inner">Most Level 2 charger installations in the Philadelphia metro area — including Montgomery, Bucks, Chester, and Delaware counties — run between $900 and $1,400. Labor-only jobs where you already own the charger and your panel has capacity tend to come in closer to $900. Homes needing a dedicated breaker, longer wiring runs, or outdoor weatherproofing typically land in the $1,100–$1,400 range. We provide a firm written quote before any work begins — no surprises.</div></div>
         </div>
         <div class="faq-item">
           <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">Do I need a permit? What happens if I skip it?</span>
+            <span class="faq-q-text">Do I need a permit for EV charger installation in Pennsylvania or New Jersey?</span>
             <div class="faq-plus">+</div>
           </button>
-          <div class="faq-answer"><div class="faq-answer-inner">Yes — every PA and NJ municipality requires an electrical permit for EV charger installation. Skipping it is risky: an unpermitted installation can void your homeowner's insurance, create issues when you sell your home, and is a liability if something ever goes wrong. We pull every permit and schedule the inspection. It's included in our price, not an add-on.</div></div>
+          <div class="faq-answer"><div class="faq-answer-inner">In most PA and NJ municipalities, yes — a permit is required for any new 240V dedicated circuit, which is standard for Level 2 charger installation. Skipping it is risky: an unpermitted installation can void your homeowner's insurance and create problems when you sell. We check the specific requirements for your municipality, pull the permit when needed, and schedule any required inspections. It's part of our process, not a billable add-on.</div></div>
         </div>
         <div class="faq-item">
           <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">Does my panel need an upgrade?</span>
+            <span class="faq-q-text">How do I claim the PECO EV charger rebate in Pennsylvania?</span>
             <div class="faq-plus">+</div>
           </button>
-          <div class="faq-answer"><div class="faq-answer-inner">Not always. Most homes built after 1990 have 200A panels with available capacity. Homes built in the 1950s–70s — common in Delaware County, South Philly, and older NJ suburbs — often have 60A or 100A panels that need upgrading first. Our electrician assesses your panel during the free consultation and tells you exactly what's needed. No upsell, just honest assessment.</div></div>
+          <div class="faq-answer"><div class="faq-answer-inner">PECO offers a rebate of up to $250 for qualifying Level 2 EV charger installations at residential properties in their PA service territory. You typically apply through PECO's website and submit proof of purchase and professional installation. We make sure the installation meets PECO's requirements and walk our PA customers through the rebate application process. Rebate amounts and program terms can change — we verify current availability before your install date.</div></div>
         </div>
         <div class="faq-item">
           <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">How fast can you schedule an install?</span>
+            <span class="faq-q-text">Can I get the PSE&amp;G EV charger rebate in South Jersey — and how does it work?</span>
             <div class="faq-plus">+</div>
           </button>
-          <div class="faq-answer"><div class="faq-answer-inner">Typically within 3–5 business days of your initial call. We're a new operation, which currently means shorter wait times than larger companies. As we grow and add more contractor partners, we'll maintain fast scheduling as a core commitment.</div></div>
+          <div class="faq-answer"><div class="faq-answer-inner">Yes. PSE&amp;G's EV charger rebate program covers qualifying Level 2 installations at homes in their NJ service area, including Burlington, Camden, and Gloucester counties. The rebate can range from $250 upward depending on the active program tier. The charger must be installed by a licensed electrician and meet program specifications. We serve all three South Jersey counties, handle the installation to PSE&amp;G's standards, and help you navigate the rebate paperwork so you don't have to chase forms after the job is done.</div></div>
         </div>
         <div class="faq-item">
           <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">Which charger brand should I buy?</span>
+            <span class="faq-q-text">Is the federal tax credit for home EV charger installation still available, and does my address qualify?</span>
             <div class="faq-plus">+</div>
           </button>
-          <div class="faq-answer"><div class="faq-answer-inner">Tesla owners: get the Gen 3 Tesla Wall Connector — it's purpose-built, app-connected, and eligible for Tesla's own installation credits. For all other EVs, we recommend ChargePoint Home Flex (48A, WiFi) or Emporia Level 2 for the best value. We install all brands — if you already have one, we'll install it. If you don't, we'll recommend the right one for your vehicle and home setup.</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-btn" onclick="toggleFaq(this)">
-            <span class="faq-q-text">Are you a contractor or a lead-gen service?</span>
-            <div class="faq-plus">+</div>
-          </button>
-          <div class="faq-answer"><div class="faq-answer-inner">Honest answer: we're a lead-gen and coordination platform — we connect EV owners with pre-vetted licensed electricians. Our founding partner and primary contractor is Red Flow Electric, a licensed Philadelphia-area electrical firm. Over time we're building a network of vetted contractors across all 9 counties. Every contractor we use is licensed, insured, and held to our standards.</div></div>
+          <div class="faq-answer"><div class="faq-answer-inner">Yes — the federal Alternative Fuel Vehicle Refueling Property Credit (IRS Form 8911) was extended through 2032 as part of the Inflation Reduction Act. It covers 30% of your charger equipment and installation costs, up to $1,000 for residential properties. Eligibility is location-dependent: your property must be in a qualifying census tract as defined by the IRS. Most homeowners in our 8-county service area qualify, but we recommend confirming with a tax professional. We provide an itemized invoice that makes claiming the credit straightforward.</div></div>
         </div>
       </div>
     </div>
@@ -941,7 +920,7 @@
       <div class="final-cta-inner">
         <div class="section-eyebrow" style="justify-content:center;margin-bottom:16px;">Ready to Get Started</div>
         <h2 class="cta-h">Stop Charging Slow.<br><span>Start This Week.</span></h2>
-        <p class="cta-p">Call us or submit the form. A licensed electrician calls you back within 2 hours. Same-week installs available across all 9 counties in PA & NJ.</p>
+        <p class="cta-p">Call us or submit the form. A licensed electrician calls you back within 2 hours. Same-week installs available across all 8 counties in PA &amp; NJ.</p>
         <a href="tel:+12155550199" class="cta-phone-big">⚡ (215) 555-0199</a>
         <div class="cta-btns">
           <a class="pill-btn charge xl" onclick="focusForm()">Get My Free Quote</a>
@@ -1035,7 +1014,9 @@
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <div class="login-card">
+
+  <!-- ── Sign-in card ─────────────────────────────────── -->
+  <div class="login-card" id="login-card">
     <button onclick="closeDashboardOverlay()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--gray);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px" title="Back to website">✕</button>
     <div class="login-logo">
       <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
@@ -1043,19 +1024,64 @@
     </div>
     <h2 class="login-title">Welcome back</h2>
     <p class="login-sub">Sign in to your account to continue</p>
-    <div class="demo-btns">
-      <div class="demo-btn active" id="demo-admin" onclick="fillDemo('admin')"><strong>🛡️ Admin Demo</strong>Full access · All leads</div>
-      <div class="demo-btn" id="demo-contractor" onclick="fillDemo('contractor')"><strong>🔧 Contractor Demo</strong>Red Flow Electric</div>
+    <div class="login-error" id="login-error" style="display:none"></div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="login-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In →</button>
+    <div style="text-align:center;margin-top:14px">
+      <button onclick="showForgotPassword()" style="background:none;border:none;color:var(--blue-bright);font-size:.82rem;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif">Forgot password?</button>
     </div>
-    <div class="login-error" id="login-error">Invalid credentials. Use the demo buttons above.</div>
-    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="login-email" placeholder="your@email.com"></div>
-    <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="login-password" placeholder="••••••••"></div>
-    <button class="btn-login" onclick="doLogin()">Sign In →</button>
   </div>
+
+  <!-- ── Forgot-password panel ───────────────────────── -->
+  <div id="forgot-password-panel" style="display:none;flex-direction:column;gap:16px;width:100%;max-width:360px">
+    <div class="login-logo">
+      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
+    </div>
+    <h2 class="login-title" style="margin:0">Reset Password</h2>
+    <p class="login-sub" style="margin:0">Enter your email and we'll send a reset link.</p>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="forgot-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div id="forgot-msg" style="display:none;font-size:.82rem"></div>
+    <button class="btn-login" onclick="doForgotPassword()">Send Reset Link →</button>
+    <div style="text-align:center">
+      <button onclick="hideForgotPassword()" style="background:none;border:none;color:var(--blue-bright);font-size:.82rem;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif">← Back to sign in</button>
+    </div>
+  </div>
+
+  <!-- ── Reset / Set-password panel (invite + recovery) ─ -->
+  <div id="reset-password-panel" style="display:none;flex-direction:column;gap:16px;width:100%;max-width:360px">
+    <div class="login-logo">
+      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
+    </div>
+    <h2 class="login-title" style="margin:0">Set Your Password</h2>
+    <p class="login-sub" style="margin:0">Choose a secure password for your account.</p>
+    <div class="form-group"><label class="form-label">New Password</label><input type="password" class="form-input" id="rp-new" placeholder="Min 8 characters" autocomplete="new-password"></div>
+    <div class="form-group"><label class="form-label">Confirm Password</label><input type="password" class="form-input" id="rp-confirm" placeholder="Repeat new password" autocomplete="new-password"></div>
+    <div id="rp-error" style="display:none;color:var(--red);font-size:.82rem"></div>
+    <button class="btn-login" id="rp-btn" onclick="doResetPassword()">Set Password →</button>
+  </div>
+
 </div>
+
+<script>
+function showForgotPassword() {
+  document.getElementById('login-card').style.display           = 'none';
+  document.getElementById('forgot-password-panel').style.display = 'flex';
+  // Reset state
+  const msg = document.getElementById('forgot-msg');
+  const inp = document.getElementById('forgot-email');
+  if (msg) { msg.style.display = 'none'; }
+  if (inp) { inp.style.display = ''; inp.value = ''; }
+}
+function hideForgotPassword() {
+  document.getElementById('forgot-password-panel').style.display = 'none';
+  document.getElementById('login-card').style.display             = '';
+}
+</script>
 
 <!-- APP -->
 <div id="app">
+  <div id="dash-sidebar-backdrop" onclick="closeDashSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:36px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(25,184,240,0.25))">
@@ -1072,7 +1098,8 @@
   </aside>
 
   <header class="topbar">
-    <button onclick="closeDashboardOverlay()" style="background:none;border:1px solid rgba(148,163,184,0.2);color:var(--gray);border-radius:8px;padding:5px 12px;font-size:.78rem;cursor:pointer;margin-right:12px;font-family:'Exo 2',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.color='#f8fafc';this.style.borderColor='rgba(59,130,246,0.4)'" onmouseout="this.style.color='';this.style.borderColor='rgba(148,163,184,0.2)'">← Site</button>
+    <button class="dash-hamburger" onclick="toggleDashSidebar()" aria-label="Toggle menu">☰</button>
+    <button class="site-back-btn" onclick="closeDashboardOverlay()" style="background:none;border:1px solid rgba(148,163,184,0.2);color:var(--gray);border-radius:8px;padding:5px 12px;font-size:.78rem;cursor:pointer;margin-right:4px;font-family:'Exo 2',sans-serif;white-space:nowrap;transition:all .2s" onmouseover="this.style.color='#f8fafc';this.style.borderColor='rgba(59,130,246,0.4)'" onmouseout="this.style.color='';this.style.borderColor='rgba(148,163,184,0.2)'">← Site</button>
     <div class="topbar-title" id="topbar-title">Dashboard</div>
     <div class="topbar-search"><span>🔍</span><input type="text" id="global-search" placeholder="Search leads..." oninput="globalSearch(this.value)"></div>
     <div class="topbar-btn" id="notif-btn" onclick="toggleNotif()">🔔<span class="notif-dot" id="notif-dot"></span></div>
@@ -1102,6 +1129,89 @@
 
 
 </div>
+<!-- Supabase client (must load before js/supabase.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/supabase.js"></script>
 <script src="js/app.js"></script>
+<script>
+// ── Step 1: Register auth listener on every page load ─────────────────────
+// Handles invite/recovery SIGNED_IN event via _awaitingPasswordSetup flag.
+// Must run BEFORE handleAuthRedirect() sets that flag.
+if (typeof _setupAuthStateChange === 'function') {
+  _setupAuthStateChange();
+}
+
+// ── Step 2: Detect invite / password-reset redirect ───────────────────────
+// Check the hash NOW (synchronously) because Supabase clears it asynchronously
+// during client init — by the time SIGNED_IN fires, the hash is already gone.
+(function handleAuthRedirect() {
+  const hash   = window.location.hash;
+  const search = window.location.search;
+  // Implicit flow:  tokens in hash  (#access_token=...&type=recovery)
+  // PKCE flow:      code in query    (?code=...&type=recovery)
+  // Both styles must be detected here — the hash is cleared by the Supabase
+  // client before any async auth event fires, so this must run synchronously.
+  const isRecovery = hash.includes('type=recovery') || search.includes('type=recovery');
+  const isInvite   = hash.includes('type=invite')   || search.includes('type=invite');
+  if (!isRecovery && !isInvite) return;
+  console.log('[handleAuthRedirect] detected', isRecovery ? 'recovery' : 'invite',
+    '| hash prefix:', hash.slice(0, 50), '| search:', search.slice(0, 80));
+
+  // Signal SIGNED_IN listener to show set-password form, not auto-route.
+  _awaitingPasswordSetup = true;
+
+  // Mark portal as intentionally open — ensures session restore works if user
+  // refreshes after setting their password (invite/recovery link is a portal entry).
+  sessionStorage.setItem('ev_portal_open', '1');
+
+  // Show the panel immediately (synchronous — no waiting for async events).
+  const overlay = document.getElementById('dash-overlay');
+  if (overlay) { overlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  const loginScreen = document.getElementById('login-screen');
+  const loginCard   = document.getElementById('login-card');
+  const resetPanel  = document.getElementById('reset-password-panel');
+  if (loginScreen) loginScreen.style.display = 'flex';
+  if (loginCard)   loginCard.style.display   = 'none';
+  if (resetPanel)  resetPanel.style.display  = 'flex';
+})();
+
+// ── Step 3: Session restore — auto-route if already logged in ─────────────
+// Only activates when the user has explicitly opened the portal (sessionStorage
+// flag set by openDashboard). This prevents the dashboard from hijacking the
+// public website on a normal page visit, even when a session exists.
+// The flag persists through refreshes (sessionStorage is tab-scoped) so users
+// who refresh while in the dashboard stay logged in. It is cleared on logout
+// and when the portal overlay is closed.
+(async function tryRestoreSession() {
+  if (_awaitingPasswordSetup) return; // invite/recovery flow is handling this
+  if (!sessionStorage.getItem('ev_portal_open')) return; // user hasn't opened portal
+  if (typeof isSupabaseReady !== 'function' || !isSupabaseReady()) return;
+  try {
+    const session = await sbGetSession();
+    if (!session?.user) return; // no saved session
+    // Open the portal overlay before routing
+    const overlay = document.getElementById('dash-overlay');
+    if (overlay) { overlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    await _resolveAuthUser(session.user);
+    console.log('[SessionRestore] resolved:', currentUser?.role, currentUser?.email);
+    if (currentUser) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      try {
+        initApp();
+      } catch(initErr) {
+        console.error('[SessionRestore] initApp threw:', initErr);
+        if (typeof _showDashboardError === 'function') {
+          _showDashboardError('Session restore failed. Please sign in again.', true);
+        }
+      }
+    }
+  } catch(e) { console.warn('[SessionRestore]', e.message); }
+})();
+</script>
 </body>
 </html>

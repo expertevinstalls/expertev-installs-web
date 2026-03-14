@@ -1707,6 +1707,7 @@ footer {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 #dash-overlay #login-screen {
   position: absolute !important;
@@ -1773,7 +1774,6 @@ footer {
 .btn-logout{background:none;border:none;color:var(--gray);cursor:pointer;font-size:1rem;padding:4px;border-radius:6px;transition:color .2s}
 .btn-logout:hover{color:var(--red)}
 /* MAIN */
-#dash-overlay .main{margin-left:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:50;background:rgba(10,15,30,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--navy-border);padding:0 32px;height:64px;display:flex;align-items:center;gap:16px}
 .topbar-title{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;flex:1}
 .topbar-search{display:flex;align-items:center;gap:10px;background:var(--navy-light);border:1px solid var(--navy-border);border-radius:10px;padding:8px 14px;width:260px}
@@ -2013,8 +2013,129 @@ footer {
 #dash-overlay ::-webkit-scrollbar-track{background:transparent}
 #dash-overlay ::-webkit-scrollbar-thumb{background:var(--navy-border);border-radius:3px}
 #dash-overlay ::-webkit-scrollbar-thumb:hover{background:var(--blue)}
-@media(max-width:900px){.two-col,.grid-2,.grid-3{grid-template-columns:1fr}.contractor-stats{display:none}.topbar-search{display:none}#dash-overlay .main{margin-left:0}}
+/* ── Mobile hamburger button (hidden on desktop) ── */
+.dash-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--gray);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  line-height: 1;
+  transition: color .2s;
+  flex-shrink: 0;
+}
+.dash-hamburger:hover { color: var(--white-d); }
 
+/* ── Sidebar backdrop — tap to close on mobile ── */
+#dash-sidebar-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 200;
+}
+#dash-sidebar-backdrop.mob-open { display: block; }
+
+/* ── Tablet (≤900px): collapse grids, hide search ── */
+@media (max-width: 900px) {
+  .two-col, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .contractor-stats { display: none; }
+  .topbar-search { display: none; }
+  #dash-overlay .topbar { left: 0 !important; }
+  #dash-overlay .main  { left: 0 !important; margin-left: 0 !important; }
+}
+
+/* ── Mobile (≤767px): overlay sidebar, single-column, full-width content ── */
+@media (max-width: 767px) {
+
+  /* Hamburger: show on mobile */
+  .dash-hamburger { display: flex; align-items: center; justify-content: center; }
+
+  /* Topbar: full width, tighter padding */
+  #dash-overlay .topbar {
+    left: 0 !important;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  #dash-overlay .topbar-title { font-size: .88rem; }
+
+  /* ← Site button: compact on mobile */
+  #dash-overlay .topbar .site-back-btn { padding: 4px 8px; font-size: .72rem; }
+
+  /* Sidebar: hidden off left edge, slides in as overlay */
+  #dash-overlay .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 201;
+    height: 100%;
+  }
+  #dash-overlay .sidebar.mob-open { transform: translateX(0); }
+
+  /* Main area: full width when sidebar closed */
+  #dash-overlay .main {
+    left: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  /* Page padding: tighter on small screens */
+  #dash-overlay .page { padding: 16px 14px; }
+
+  /* Stat cards: 2-col grid, reduced padding */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card  { padding: 14px 16px; }
+  .stat-value { font-size: 1.5rem; }
+
+  /* All multi-col grids collapse to single column */
+  .two-col, .grid-2, .grid-3, .intel-cards-grid { grid-template-columns: 1fr; }
+
+  /* Intel card inner grid: keep 2-col (it fits) */
+  .intel-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Card body padding */
+  .card-body { padding: 14px; }
+
+  /* Pipeline: horizontal scroll only within itself */
+  .pipeline { overflow-x: auto; }
+
+  /* Lead row / table rows: stack on mobile */
+  .lead-row { flex-wrap: wrap; gap: 6px; }
+
+  /* Notif panel: full width on mobile */
+  #dash-overlay .notif-panel { right: 8px; left: 8px; width: auto; }
+}
+
+/* ── Very small phones (≤400px): single-column stats, tighter spacing ── */
+@media (max-width: 400px) {
+  .stats-grid   { grid-template-columns: 1fr; }
+  .intel-grid   { grid-template-columns: 1fr; }
+  #dash-overlay .page { padding: 12px 10px; }
+  .stat-value   { font-size: 1.3rem; }
+}
+
+
+/* ── Coverage map: always visible, never collapses ── */
+#coverage-map-container {
+  display: block !important;
+  min-height: 240px;
+  width: 100%;
+  position: relative;
+}
+@media (max-width: 767px) {
+  #coverage-map-container {
+    height: 280px !important;
+    min-height: 280px;
+    border-radius: 0 0 14px 14px;
+  }
+}
+@media (max-width: 400px) {
+  #coverage-map-container {
+    height: 240px !important;
+    min-height: 240px;
+  }
+}
 
 /* ── Nav Portal Button ── */
 .nav-portal-btn {
@@ -2565,4 +2686,161 @@ footer {
   .outlet-compare { grid-template-columns: 1fr; }
   .outlet-vs { display: none; }
   .authority-inner { grid-template-columns: 1fr; gap: 32px; }
+}
+
+
+/* ============================================================
+   PHASE 5 RESPONSIVE ADDITIONS
+   Contractor management, auth forms, tables → card pattern
+============================================================ */
+
+/* ── Login screen: centre content on all screen sizes ── */
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+#login-screen .login-card,
+#forgot-password-panel,
+#reset-password-panel {
+  width: 100%;
+  max-width: 360px;
+}
+
+/* ── Auth form rows: stack on narrow screens ── */
+@media (max-width: 600px) {
+  .login-card { padding: 28px 20px; }
+  #forgot-password-panel,
+  #reset-password-panel   { gap: 12px; }
+}
+
+/* ── Contractor card: responsive layout ── */
+.contractor-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid rgba(30,45,74,.6);
+  border-radius: 12px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.contractor-info  { flex: 1; min-width: 0; }
+.contractor-name  { font-size: .95rem; font-weight: 700; color: var(--white); }
+.contractor-meta  { font-size: .78rem; color: var(--gray); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 767px) {
+  .contractor-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .contractor-card > div:last-child {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .contractor-stats {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .c-stat-val { font-size: .9rem; }
+  .c-stat-lbl { font-size: .65rem; }
+}
+
+@media (max-width: 480px) {
+  .contractor-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Tables → card pattern on mobile ── */
+@media (max-width: 767px) {
+
+  /* Assign-leads table: show only key columns */
+  .leads-table thead tr th:nth-child(n+5):not(:last-child),
+  .leads-table tbody tr td:nth-child(n+5):not(:last-child) {
+    display: none;
+  }
+
+  /* Revenue completed-jobs table: hide less-critical columns */
+  #page-revenue .leads-table thead tr th:nth-child(5),
+  #page-revenue .leads-table thead tr th:nth-child(6),
+  #page-revenue .leads-table tbody tr td:nth-child(5),
+  #page-revenue .leads-table tbody tr td:nth-child(6) {
+    display: none;
+  }
+
+  /* Table horizontal scroll fallback for any table that can't collapse */
+  .leads-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Modal: full-screen on phones */
+  #dash-overlay .modal-overlay { padding: 0; align-items: flex-end; }
+  #dash-overlay .modal {
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Form rows: stack inputs vertically */
+  .form-row { flex-direction: column; gap: 0; }
+
+  /* Page header: stack title + button */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .page-header h1 { font-size: 1.3rem; }
+
+  /* Add-contractor form: full-width inputs */
+  #ac-company, #ac-contact, #ac-email, #ac-phone, #ac-lic { width: 100%; box-sizing: border-box; }
+
+  /* My-profile grid: already collapses via .grid-2 rule, but ensure card gaps */
+  #page-my-profile .card { margin-bottom: 0; }
+
+  /* Change-password form rows on mobile */
+  #page-my-profile .form-row { display: flex; flex-direction: column; gap: 0; }
+
+  /* Topbar: tighten user info text */
+  .topbar-user-name  { display: none; }
+  .topbar-user-role  { display: none; }
+}
+
+/* ── Very small phones ── */
+@media (max-width: 400px) {
+  .contractor-card { padding: 12px; }
+  .contractor-avatar { width: 36px; height: 36px; font-size: .9rem; }
+  #dash-overlay .modal { border-radius: 12px 12px 0 0; }
+}
+
+/* ── Tablet: contractor card stats stay visible but compact ── */
+@media (min-width: 768px) and (max-width: 900px) {
+  .contractor-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+
+/* ── My-profile change-password card ── */
+#page-my-profile .card .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 600px) {
+  #page-my-profile .card .form-row { grid-template-columns: 1fr; }
 }

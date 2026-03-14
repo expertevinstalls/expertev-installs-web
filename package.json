@@ -1,0 +1,12 @@
+{
+  "name": "expertev-dev",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node serve.mjs"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  }
+}

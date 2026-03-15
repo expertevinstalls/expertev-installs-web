@@ -440,92 +440,6 @@ function estimateJobValue(complexity) {
   return { ...r, label: `$${r.min.toLocaleString()}–$${r.max.toLocaleString()}` };
 }
 
-/* ── AI Panel Photo Analysis (simulated) ── */
-function runPanelAnalysis(leadId) {
-  const l = leads.find(x => x.id === leadId);
-  if (!l) return;
-  const sec = document.getElementById('ai-panel-section-' + leadId);
-  if (!sec) return;
-
-  // Show scanning animation
-  sec.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
-      <div style="width:18px;height:18px;border:2px solid rgba(99,102,241,.3);border-top-color:#a5b4fc;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>
-      <div>
-        <div style="font-size:.82rem;color:#a5b4fc;font-weight:600">Analyzing panel photo…</div>
-        <div style="font-size:.74rem;color:var(--gray);margin-top:2px">Running electrical panel detection model</div>
-      </div>
-    </div>
-    <div style="margin-top:10px;height:4px;background:rgba(99,102,241,.15);border-radius:4px;overflow:hidden">
-      <div id="ai-progress-${leadId}" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#a5b4fc);border-radius:4px;transition:width .3s ease"></div>
-    </div>`;
-
-  // Animate progress bar
-  let pct = 0;
-  const prog = document.getElementById('ai-progress-' + leadId);
-  const ticker = setInterval(() => {
-    pct = Math.min(pct + Math.random() * 18 + 4, 92);
-    if (prog) prog.style.width = pct + '%';
-  }, 250);
-
-  // Mock analysis results based on lead data
-  setTimeout(() => {
-    clearInterval(ticker);
-    if (prog) prog.style.width = '100%';
-
-    const panelSize = l.panelSize || 'notsure';
-    const ji = getJobIntelligence(l);
-
-    // Pick realistic mock results from panel data
-    const panelTypes = { '200amp':'Square D QO 200A Main Breaker', '150amp':'Siemens PL 150A Main Breaker', '100amp':'Cutler-Hammer 100A Legacy Panel', notsure:'Unidentified Panel — Inspection Required' };
-    const amperages = { '200amp':'200A', '150amp':'150A', '100amp':'100A', notsure:'~100–125A (estimated)' };
-    const slotMaps  = { '200amp':'6 slots available (40A capacity)', '150amp':'3 slots available (20A capacity)', '100amp':'0 slots — panel full', notsure:'Unknown — field inspection needed' };
-    const upgradeMap= { '200amp':'None required', '150amp':'Sub-panel recommended for EVSE', '100amp':'Panel upgrade required — 200A upgrade advised', notsure:'Cannot determine — on-site evaluation required' };
-
-    l.aiAnalysis = {
-      panelType:    panelTypes[panelSize]  || panelTypes.notsure,
-      amperage:     amperages[panelSize]   || amperages.notsure,
-      breakers:     slotMaps[panelSize]    || slotMaps.notsure,
-      upgradeNeeded:upgradeMap[panelSize]  || upgradeMap.notsure,
-      adjustedComplexity: ji.complexity,
-      adjustedValue: '$' + ji.valueMin.toLocaleString() + ' – $' + ji.valueMax.toLocaleString(),
-      confidence:   panelSize !== 'notsure' ? '94%' : '61%',
-      analyzedAt:   new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
-    };
-
-    // Re-render AI section with results
-    const rows = [
-      ['Panel Type',          l.aiAnalysis.panelType],
-      ['Amperage Detected',   l.aiAnalysis.amperage],
-      ['Breaker Availability',l.aiAnalysis.breakers],
-      ['Upgrade Requirement', l.aiAnalysis.upgradeNeeded],
-      ['Adjusted Complexity', l.aiAnalysis.adjustedComplexity],
-      ['Adjusted Est. Value', l.aiAnalysis.adjustedValue],
-      ['AI Confidence',       l.aiAnalysis.confidence],
-    ];
-    sec.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:7px">
-          <span style="font-size:.8rem;font-weight:700;color:#a5b4fc">🤖 AI Panel Analysis</span>
-          <span style="font-size:.7rem;background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.3);border-radius:20px;padding:2px 8px">Complete</span>
-        </div>
-        <span style="font-size:.7rem;color:var(--gray)">Analyzed at ${l.aiAnalysis.analyzedAt}</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:0">
-        ${rows.map(([lbl,val],i)=>`
-        <div class="ai-result-row" style="${i%2===0?'background:rgba(255,255,255,.02)':''}">
-          <span class="ai-result-label">${lbl}</span>
-          <span class="ai-result-val">${val}</span>
-        </div>`).join('')}
-      </div>
-      <div style="margin-top:10px;font-size:.74rem;color:rgba(165,180,252,.6);border-top:1px solid rgba(99,102,241,.15);padding-top:8px">
-        ⚠ AI analysis is a decision-support tool. Always perform an on-site inspection before quoting.
-      </div>`;
-
-    showToast('✅ Panel analysis complete — results ready');
-    addNotification(`🤖 AI analysis complete for lead ${sanitizeHTML(l.name || leadId)}`);
-  }, 2800);
-}
 
 /**
  * Returns the live contractors array.
@@ -2532,7 +2446,6 @@ function pgMyLeads() {
         <button class="btn btn-outline btn-sm" onclick="toggleMyLeadsView()">⊞ Toggle View</button>
       </div>
     </div>
-    <div class="alert-box info" style="margin-bottom:16px">⚡ <div><strong>Lead Profit Estimator is active.</strong> Each card shows estimated job value, install time, difficulty, and profit potential — so you can prioritize before calling.</div></div>
     <div id="my-leads-wrap"></div>
   </div>`;
 }
@@ -2807,27 +2720,6 @@ function openLeadDetail(id) {
           <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:6px">Lead Source</div>
           <div style="font-size:1.05rem;font-weight:800;color:#fbbf24">${l.leadSource||'Direct'}</div>
         </div>
-      </div>
-      <!-- AI Panel Analysis -->
-      <div id="ai-panel-section-${l.id}" class="ai-panel">
-        <div class="ai-panel-header">
-          <span style="font-size:1rem">🤖</span>
-          <div class="ai-panel-title">AI Panel Photo Analysis — Phase 2</div>
-        </div>
-        ${l.aiAnalysis ? `
-          <div style="margin-bottom:8px;font-size:.75rem;color:#6ee7b7;display:flex;align-items:center;gap:6px"><span>✅</span> Analysis complete · Analyzed at ${l.aiAnalysis.analyzedAt||'recently'}</div>
-          ${[
-            ['Panel Type',         l.aiAnalysis.panelType],
-            ['Detected Amperage',  l.aiAnalysis.amperage],
-            ['Available Breakers', l.aiAnalysis.breakers],
-            ['Upgrade Required',   l.aiAnalysis.upgradeNeeded],
-            ['Adjusted Complexity',l.aiAnalysis.adjustedComplexity],
-            ['Adjusted Est. Value',l.aiAnalysis.adjustedValue],
-          ].map(([lbl,val])=>`<div class="ai-result-row"><span class="ai-result-label">${lbl}</span><span class="ai-result-val">${val||'—'}</span></div>`).join('')}
-        ` : `
-          <div style="font-size:.82rem;color:var(--gray);margin-bottom:12px">Upload a panel photo on the quote form to enable AI analysis. This feature automatically detects panel type, amperage, and available capacity — improving estimate accuracy.</div>
-          <button class="btn btn-outline btn-sm" style="border-color:rgba(99,102,241,.5);color:#a5b4fc" onclick="runPanelAnalysis('${l.id}')">🔬 Simulate Panel Analysis</button>
-        `}
       </div>
     </div>
     <div class="tab-panel" id="tab-details">

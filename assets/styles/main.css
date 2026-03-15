@@ -1996,18 +1996,7 @@ footer {
 .intel-card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 20px;background:rgba(0,0,0,.2);flex-wrap:wrap}
 .profit-banner{position:absolute;top:0;left:0;right:0;height:3px}
 .intel-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
-/* Panel Analysis */
-.ai-panel{background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px 16px;margin-top:14px}
-.ai-panel-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.ai-panel-title{font-size:.8rem;font-weight:700;color:#a5b4fc;letter-spacing:.04em;text-transform:uppercase}
-.ai-scanning{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--gray)}
-.ai-dot{width:8px;height:8px;border-radius:50%;background:#818cf8;animation:aipulse 1s ease-in-out infinite alternate}
-@keyframes aipulse{from{opacity:.3;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.ai-result-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(99,102,241,0.15);font-size:.8rem}
-.ai-result-row:last-child{border-bottom:none}
-.ai-result-label{color:#94a3b8}
-.ai-result-val{color:var(--white);font-weight:600}
 /* SCROLLBAR */
 #dash-overlay ::-webkit-scrollbar{width:6px;height:6px}
 #dash-overlay ::-webkit-scrollbar-track{background:transparent}

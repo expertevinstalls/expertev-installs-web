@@ -211,8 +211,8 @@ Deno.serve(async (req: Request) => {
         revenue:      0,
         rating:       5.0,
       };
-      // Only set ID if explicitly provided (otherwise let DB generate/default)
-      if (contractorId) insertPayload.id = contractorId;
+      // Always provide an ID — contractors.id has no DB default (TEXT PRIMARY KEY, no gen_random_uuid()).
+      insertPayload.id = contractorId || crypto.randomUUID();
 
       const { data: newContractor, error: insertErr } = await adminClient
         .from("contractors")

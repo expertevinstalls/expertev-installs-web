@@ -2499,7 +2499,7 @@ function saveSettings() {
 function pgMyLeads() {
   return `<div class="page" id="page-my-leads">
     <div class="page-header">
-      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — Red Flow Electric</p></div>
+      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${currentUser?.name || ''}</p></div>
       <div class="page-header-actions">
         <button class="btn btn-outline btn-sm" onclick="toggleMyLeadsView()">⊞ Toggle View</button>
       </div>

@@ -266,6 +266,61 @@ async function sbSaveReview(id, rating, text) {
   });
 }
 
+/**
+ * Save the contractor's quoted/agreed price for a lead.
+ * Does NOT overwrite the original `value` (estimated) field.
+ * updatedBy: contractor ID or display name for audit trail.
+ * Returns the updated DB row or null.
+ */
+async function sbSaveQuote(leadId, amount, notes, updatedBy) {
+  return sbUpdateLead(leadId, {
+    quote_amount:     amount,
+    quote_notes:      notes     ?? '',
+    quote_updated_at: new Date().toISOString(),
+    quote_updated_by: updatedBy ?? '',
+  });
+}
+
+/**
+ * Log a lead assignment change (reclaim or reassign) for audit trail.
+ * fromContractorId: previous contractor ID, or null if was unassigned.
+ * toContractorId:   new contractor ID, or null if being reclaimed/unassigned.
+ * changedBy:        admin email or display name.
+ * reason:           optional free-text reason.
+ * Returns inserted row or null.
+ */
+async function sbLogAssignmentHistory(leadId, fromContractorId, toContractorId, changedBy, reason) {
+  const db = _db();
+  if (!db) return null;
+  const { error } = await db
+    .from('lead_assignment_history')
+    .insert([{
+      lead_id:             leadId,
+      from_contractor_id:  fromContractorId || null,
+      to_contractor_id:    toContractorId   || null,
+      changed_by:          changedBy        || '',
+      reason:              reason           || '',
+    }]);
+  if (error) { console.error('[Supabase] logAssignmentHistory:', error.message); return null; }
+  return { lead_id: leadId, from_contractor_id: fromContractorId, to_contractor_id: toContractorId };
+}
+
+/**
+ * Fetch assignment history for a lead, newest first.
+ * Returns array of rows or null.
+ */
+async function sbFetchAssignmentHistory(leadId) {
+  const db = _db();
+  if (!db) return null;
+  const { data, error } = await db
+    .from('lead_assignment_history')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('[Supabase] fetchAssignmentHistory:', error.message); return null; }
+  return data;
+}
+
 
 /* ── 5. NOTES ─────────────────────────────────────────────── */
 
@@ -455,6 +510,10 @@ function _leadToRow(lead) {
     install_time:     lead.installTime      ?? '',
     profit_potential: lead.profitPotential  ?? '',
     difficulty:       lead.difficulty       ?? '',
+    quote_amount:     lead.quoteAmount      ?? null,
+    quote_notes:      lead.quoteNotes       ?? '',
+    quote_updated_at: lead.quoteUpdatedAt   ? _parseDisplayDate(lead.quoteUpdatedAt) : null,
+    quote_updated_by: lead.quoteUpdatedBy   ?? '',
     created_display:  lead.created          ?? '',
     // created_at intentionally omitted — DB sets it via DEFAULT NOW()
   };
@@ -503,6 +562,12 @@ function _rowToLead(row, notes) {
     installTime:     row.install_time     ?? '',
     profitPotential: row.profit_potential ?? '',
     difficulty:      row.difficulty       ?? '',
+    quoteAmount:     row.quote_amount     ?? null,
+    quoteNotes:      row.quote_notes      ?? '',
+    quoteUpdatedAt:  row.quote_updated_at
+      ? new Date(row.quote_updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : null,
+    quoteUpdatedBy:  row.quote_updated_by ?? '',
     created:         row.created_display  ||
       new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     notes: noteRows.map(n => ({

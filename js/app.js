@@ -2486,7 +2486,7 @@ function renderMyLeads() {
           <button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Full Details">→</button>
           ${l.status==='assigned'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','contacted')">Contacted</button>`:''}
           ${l.status==='contacted'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','scheduled')">Scheduled</button>`:''}
-          ${l.status==='scheduled'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','quote-sent')">Quote Sent</button>`:''}
+          ${l.status==='scheduled'?`<button class="btn btn-outline btn-sm" onclick="openQuoteModal('${l.id}')">Quote Sent</button>`:''}
           ${l.status==='quote-sent'?`<button class="btn btn-success btn-sm" onclick="upd('${l.id}','completed')">Job Won ✓</button><button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="upd('${l.id}','lost')">Lost</button>`:''}
         </td>
       </tr>`;
@@ -2506,7 +2506,7 @@ function buildIntelCard(l) {
   const actionBtns = `
     ${l.status==='assigned'?`<button class="btn btn-primary btn-sm" onclick="upd('${l.id}','contacted');renderMyLeads()">✓ Mark Contacted</button>`:''}
     ${l.status==='contacted'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','scheduled');renderMyLeads()">📅 Schedule Est.</button>`:''}
-    ${l.status==='scheduled'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','quote-sent');renderMyLeads()">📄 Quote Sent</button>`:''}
+    ${l.status==='scheduled'?`<button class="btn btn-outline btn-sm" onclick="openQuoteModal('${l.id}')">📄 Quote Sent</button>`:''}
     ${l.status==='quote-sent'?`<button class="btn btn-success btn-sm" onclick="upd('${l.id}','completed');renderMyLeads()">✓ Job Won</button><button class="btn btn-outline btn-sm" style="color:#f87171;border-color:#f8717140" onclick="upd('${l.id}','lost');renderMyLeads()">Lost</button>`:''}
   `;
   return `<div class="intel-card">
@@ -2578,7 +2578,7 @@ function pgMyPipeline() {
             const ji = getJobIntelligence(l);
             return `<div class="pipeline-card" onclick="openLeadDetail('${l.id}')">
               <div class="pipeline-card-name">${l.name}${l.priority==='high'?'<span style="color:var(--orange);margin-left:5px;font-size:.7rem">●</span>':''}</div>
-              <div class="pipeline-card-detail" style="color:#4ade80;font-size:.78rem;font-weight:700">${ji.valueLabel}</div>
+              ${l.quoteAmount != null ? `<div class="pipeline-card-detail" style="color:#a78bfa;font-size:.78rem;font-weight:700">$${Number(l.quoteAmount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} quoted</div>` : `<div class="pipeline-card-detail" style="color:#4ade80;font-size:.78rem;font-weight:700">${ji.valueLabel} est.</div>`}
               <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
                 <span style="font-size:.68rem;padding:2px 7px;border-radius:10px;border:1px solid ${ji.diffColor}40;color:${ji.diffColor};background:${ji.diffBg}">${ji.diffIcon} ${ji.difficulty}</span>
                 <span style="font-size:.68rem;padding:2px 7px;border-radius:10px;border:1px solid ${ji.profitColor}40;color:${ji.profitColor};background:${ji.profitBg}">${ji.profit} profit</span>
@@ -2597,7 +2597,8 @@ function pgMyRevenue() {
   const myLeads    = leads.filter(l=>l.contractor===currentUser.id);
   const done       = myLeads.filter(l=>l.status==='completed');
   const contacted  = myLeads.filter(l=>l.contactedAt);
-  const total      = done.reduce((s,l)=>s+l.value,0);
+  // Prefer contractor's quoted/agreed price for completed jobs; fall back to estimated value
+  const total      = done.reduce((s,l)=>s+(l.quoteAmount != null ? Number(l.quoteAmount) : l.value),0);
   const avgVal     = Math.round(total/(done.length||1));
   const closeRate  = myLeads.length ? Math.round(done.length/myLeads.length*100) : 0;
   const reviewd    = done.filter(l=>l.review);
@@ -2722,11 +2723,27 @@ function openLeadDetail(id) {
         </div>
       </div>
       <!-- Job Value Intelligence -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:${l.quoteAmount != null ? '1fr 1fr' : '1fr 1fr 1fr'};gap:10px;margin-bottom:${l.quoteAmount != null ? '10px' : '16px'}">
         <div style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:14px 16px;text-align:center">
           <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4ade80;margin-bottom:6px">Est. Job Value</div>
           <div style="font-size:1.05rem;font-weight:800;color:#4ade80">${_ji.valueLabel}</div>
         </div>
+        ${l.quoteAmount != null ? `
+        <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.35);border-radius:10px;padding:14px 16px;text-align:center">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a78bfa;margin-bottom:6px">Quoted Price</div>
+          <div style="font-size:1.05rem;font-weight:800;color:#a78bfa">$${Number(l.quoteAmount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+        </div>` : `
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:14px 16px;text-align:center">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a5b4fc;margin-bottom:6px">Install Time</div>
+          <div style="font-size:1.05rem;font-weight:800;color:#a5b4fc">${_ji.timeLabel}</div>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:14px 16px;text-align:center">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:6px">Lead Source</div>
+          <div style="font-size:1.05rem;font-weight:800;color:#fbbf24">${l.leadSource||'Direct'}</div>
+        </div>`}
+      </div>
+      ${l.quoteAmount != null ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
         <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:14px 16px;text-align:center">
           <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a5b4fc;margin-bottom:6px">Install Time</div>
           <div style="font-size:1.05rem;font-weight:800;color:#a5b4fc">${_ji.timeLabel}</div>
@@ -2735,7 +2752,7 @@ function openLeadDetail(id) {
           <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:6px">Lead Source</div>
           <div style="font-size:1.05rem;font-weight:800;color:#fbbf24">${l.leadSource||'Direct'}</div>
         </div>
-      </div>
+      </div>` : ''}
     </div>
     <div class="tab-panel" id="tab-details">
       ${l.complexity ? `<div style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.3);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -2759,6 +2776,8 @@ function openLeadDetail(id) {
           <div class="detail-row"><div class="detail-label">Install Location</div><div class="detail-value">${(l.installLocation||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||'—'}</div></div>
           <div class="detail-row"><div class="detail-label">Rebate</div><div class="detail-value"><span class="rebate-tag">${l.rebate}</span></div></div>
           <div class="detail-row"><div class="detail-label">Est. Value</div><div class="detail-value" style="color:var(--green);font-weight:600;font-size:1.05rem">$${l.value.toLocaleString()}</div></div>
+          ${l.quoteAmount != null ? `<div class="detail-row"><div class="detail-label">Quoted Price</div><div class="detail-value" style="color:#a78bfa;font-weight:700;font-size:1.05rem">$${Number(l.quoteAmount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${l.quoteUpdatedAt?`<span style="font-size:.72rem;color:var(--gray);font-weight:400;margin-left:8px">saved ${sanitizeHTML(l.quoteUpdatedAt)}</span>`:''}</div></div>` : ''}
+          ${l.quoteNotes ? `<div class="detail-row"><div class="detail-label">Quote Notes</div><div class="detail-value" style="font-size:.85rem;color:var(--silver)">${sanitizeHTML(l.quoteNotes)}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Assigned To</div><div class="detail-value">${cName}</div></div>
           <div class="detail-row"><div class="detail-label">Submitted</div><div class="detail-value">${l.created}</div></div>
           ${l.contactedAt ? `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--green)">${l.contactedAt}</div></div>` : `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--red)">Not yet</div></div>`}
@@ -2821,12 +2840,54 @@ function openLeadDetail(id) {
             <option value="high" ${l.priority==='high'?'selected':''}>High Priority</option>
           </select>
         </div>
+      </div>
+      <div style="border-top:1px solid rgba(30,45,74,.6);margin:18px 0 12px;padding-top:4px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);font-weight:700">Admin Actions</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" style="color:#fbbf24;border-color:#fbbf2440" onclick="closeModalDirect();openReassignModal('${l.id}')">🔄 Reassign Lead</button>
+        ${l.contractor ? `<button class="btn btn-outline btn-sm" style="color:#f87171;border-color:#f8717140" onclick="closeModalDirect();openReclaimModal('${l.id}')">↩ Reclaim to Admin Pool</button>` : ''}
       </div>`:''}
+      ${currentUser.role==='contractor' && (l.status==='quote-sent'||l.status==='completed') ? `
+      <div style="border-top:1px solid rgba(30,45,74,.6);margin:18px 0 12px;padding-top:4px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);font-weight:700">Quote / Agreed Price</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Quoted / Agreed Price ($)</label>
+          <input class="form-input" id="inline-quote-amount" type="number" min="1" step="0.01"
+            placeholder="e.g. 1450.00"
+            value="${l.quoteAmount != null ? l.quoteAmount : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quote Notes</label>
+          <input class="form-input" id="inline-quote-notes" placeholder="Optional notes"
+            value="${sanitizeHTML(l.quoteNotes||'')}">
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-bottom:4px" onclick="_saveInlineQuote('${l.id}')">💾 Save Quote Amount</button>` : ''}
     </div>`;
   document.getElementById('modal-footer').innerHTML = `
     <button class="btn btn-outline" onclick="closeModalDirect()">Close</button>
     <button class="btn btn-primary" onclick="saveModal('${l.id}')">Save Changes</button>`;
   document.getElementById('modal-overlay').classList.add('open');
+}
+
+/** Save quote amount from the inline form inside the lead detail modal (Edit Lead tab). */
+function _saveInlineQuote(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const rawAmt = parseFloat(document.getElementById('inline-quote-amount')?.value);
+  if (!rawAmt || rawAmt <= 0 || isNaN(rawAmt)) { showToast('Enter a valid amount > $0'); return; }
+  const notes = document.getElementById('inline-quote-notes')?.value?.trim() ?? '';
+
+  l.quoteAmount    = rawAmt;
+  l.quoteNotes     = sanitizeHTML(notes);
+  l.quoteUpdatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  l.quoteUpdatedBy = currentUser?.name || currentUser?.id || '';
+
+  if (isSupabaseReady()) {
+    sbSaveQuote(leadId, rawAmt, l.quoteNotes, l.quoteUpdatedBy)
+      .then(r => { if (!r) console.error('[DB] _saveInlineQuote returned null for', leadId); })
+      .catch(e => console.error('[DB] _saveInlineQuote:', e.message));
+  }
+  showToast('Quote amount saved ✓');
 }
 
 function switchTab(e, id) {
@@ -2952,6 +3013,218 @@ function _onLeadCompleted(l) {
     addNotification(`📩 <strong>Review request queued</strong> for ${sanitizeHTML(l.name)} — open lead to send`);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// CONTRACTOR QUOTE MODAL
+// Opened when contractor clicks "Quote Sent" — prompts for actual
+// quoted/agreed price before transitioning the lead to quote-sent.
+// ═══════════════════════════════════════════════════════════════
+function openQuoteModal(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const existingAmount = l.quoteAmount ? l.quoteAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+  openModalWith(
+    `Quote Sent — ${sanitizeHTML(l.name)}`,
+    `<p style="color:var(--silver);font-size:.9rem;margin:0 0 18px">Enter the actual price you quoted this customer. This is saved separately from the original estimate so both are visible.</p>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Est. Job Value (original)</label>
+      <div style="font-size:1rem;font-weight:700;color:var(--green);padding:8px 0">$${(l.value||0).toLocaleString()}</div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Your Quoted / Agreed Price ($) <span style="color:#f87171">*</span></label>
+      <input class="form-input" id="quote-amount-input" type="number" min="1" step="0.01"
+        placeholder="e.g. 1450.00" value="${existingAmount}"
+        style="font-size:1.05rem;font-weight:700"
+        oninput="document.getElementById('quote-amount-error').style.display='none'">
+      <div id="quote-amount-error" style="display:none;color:#f87171;font-size:.8rem;margin-top:4px">Please enter a valid amount greater than $0.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Quote Notes (optional)</label>
+      <textarea class="form-input" id="quote-notes-input" rows="3"
+        placeholder="e.g. Includes panel upgrade, 50A circuit, 40ft conduit run">${sanitizeHTML(l.quoteNotes||'')}</textarea>
+    </div>`,
+    `<button class="btn btn-outline" onclick="saveQuoteModal('${leadId}', true)">Skip — Just Mark Sent</button>
+     <button class="btn btn-primary" onclick="saveQuoteModal('${leadId}', false)">💾 Save Quote & Mark Sent</button>`
+  );
+  setTimeout(() => document.getElementById('quote-amount-input')?.focus(), 80);
+}
+
+function saveQuoteModal(leadId, skip) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) { closeModalDirect(); return; }
+
+  if (!skip) {
+    const rawAmt = parseFloat(document.getElementById('quote-amount-input')?.value);
+    if (!rawAmt || rawAmt <= 0 || isNaN(rawAmt)) {
+      document.getElementById('quote-amount-error').style.display = 'block';
+      return; // keep modal open
+    }
+    const notes = document.getElementById('quote-notes-input')?.value?.trim() ?? '';
+
+    // Update in-memory lead immediately so UI reflects it without waiting for DB
+    l.quoteAmount    = rawAmt;
+    l.quoteNotes     = sanitizeHTML(notes);
+    l.quoteUpdatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    l.quoteUpdatedBy = currentUser?.name || currentUser?.id || '';
+
+    if (isSupabaseReady()) {
+      sbSaveQuote(leadId, rawAmt, l.quoteNotes, l.quoteUpdatedBy)
+        .then(r => {
+          if (!r) console.error('[DB] sbSaveQuote returned null for lead', leadId);
+          else console.log('[DB] Quote saved ✓', leadId, rawAmt);
+        })
+        .catch(e => console.error('[DB] sbSaveQuote error:', e.message));
+    }
+  }
+
+  // Always transition status to quote-sent
+  closeModalDirect();
+  upd(leadId, 'quote-sent');
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN RECLAIM / REASSIGN HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Reclaim a lead from its current contractor back to unassigned/admin pool.
+ * reason: optional admin note.
+ */
+function reclaimLead(leadId, reason) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const prevContractorId = l.contractor;
+  const prevContractorName = prevContractorId
+    ? ((_getContractors().find(c => c.id === prevContractorId) || {}).name || prevContractorId)
+    : 'Unassigned';
+
+  // Update in-memory immediately
+  l.contractor = null;
+  l.status     = 'new';
+
+  closeModalDirect();
+  if (document.getElementById('page-all-leads')?.classList.contains('active'))  renderLeadsTable();
+  if (document.getElementById('page-assign')?.classList.contains('active'))     renderAssignTable();
+  buildSidebar();
+  refreshAdminDashboard();
+  persist();
+
+  const noteText = `Lead reclaimed by admin from ${prevContractorName}.${reason ? ' Reason: ' + sanitizeHTML(reason) : ''}`;
+  addNote(leadId, currentUser.name || 'Admin', noteText);
+
+  if (isSupabaseReady()) {
+    sbAssignLead(leadId, null)
+      .then(r => { if (!r) console.error('[DB] reclaimLead: sbAssignLead returned null'); })
+      .catch(e => console.error('[DB] reclaimLead:', e.message));
+    sbLogAssignmentHistory(leadId, prevContractorId, null, currentUser?.email || currentUser?.name || 'Admin', reason || '')
+      .catch(e => console.error('[DB] logAssignmentHistory (reclaim):', e.message));
+  }
+  showToast(`Lead reclaimed — returned to unassigned pool`);
+}
+
+/**
+ * Open a modal to reassign a lead to a different contractor.
+ */
+function openReassignModal(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const contractors = _getContractors();
+  if (contractors.length === 0) { showToast('No active contractors available.'); return; }
+
+  const currentAssignee = l.contractor
+    ? (contractors.find(c => c.id === l.contractor) || {}).name || l.contractor
+    : 'Unassigned';
+
+  openModalWith(
+    `Reassign Lead — ${sanitizeHTML(l.name)}`,
+    `<div style="margin-bottom:16px">
+      <div class="form-label" style="margin-bottom:4px">Currently Assigned To</div>
+      <div style="font-size:.95rem;font-weight:600;color:var(--yellow)">${sanitizeHTML(currentAssignee)}</div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Assign To <span style="color:#f87171">*</span></label>
+      <select class="form-input" id="reassign-contractor-select">
+        <option value="">— Select Contractor —</option>
+        ${contractors.map(c => `<option value="${c.id}" ${l.contractor === c.id ? 'disabled style="color:var(--gray)"' : ''}>${sanitizeHTML(c.name)}${l.contractor === c.id ? ' (current)' : ''}</option>`).join('')}
+      </select>
+      <div id="reassign-contractor-error" style="display:none;color:#f87171;font-size:.8rem;margin-top:4px">Please select a contractor.</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reason / Note (optional)</label>
+      <input class="form-input" id="reassign-reason-input" placeholder="e.g. Original contractor unavailable">
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveReassign('${leadId}')">Reassign Lead →</button>`
+  );
+}
+
+function saveReassign(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) { closeModalDirect(); return; }
+
+  const selEl = document.getElementById('reassign-contractor-select');
+  const newContractorId = selEl?.value;
+  if (!newContractorId) {
+    document.getElementById('reassign-contractor-error').style.display = 'block';
+    return;
+  }
+
+  const reason = document.getElementById('reassign-reason-input')?.value?.trim() || '';
+  const prevContractorId = l.contractor;
+  const newContractor = _getContractors().find(c => c.id === newContractorId);
+  const newContractorName = newContractor?.name || newContractorId;
+  const prevContractorName = prevContractorId
+    ? ((_getContractors().find(c => c.id === prevContractorId) || {}).name || prevContractorId)
+    : 'Unassigned';
+
+  // Update in-memory immediately
+  l.contractor = newContractorId;
+  l.status     = 'assigned';
+
+  closeModalDirect();
+  if (document.getElementById('page-all-leads')?.classList.contains('active'))  renderLeadsTable();
+  if (document.getElementById('page-assign')?.classList.contains('active'))     renderAssignTable();
+  buildSidebar();
+  refreshAdminDashboard();
+  persist();
+
+  const noteText = `Reassigned by admin from ${prevContractorName} → ${newContractorName}.${reason ? ' Reason: ' + sanitizeHTML(reason) : ''}`;
+  addNote(leadId, currentUser.name || 'Admin', noteText);
+
+  if (isSupabaseReady()) {
+    sbAssignLead(leadId, newContractorId)
+      .then(r => { if (!r) console.error('[DB] saveReassign: sbAssignLead returned null'); })
+      .catch(e => console.error('[DB] saveReassign:', e.message));
+    sbLogAssignmentHistory(leadId, prevContractorId, newContractorId, currentUser?.email || currentUser?.name || 'Admin', reason)
+      .catch(e => console.error('[DB] logAssignmentHistory (reassign):', e.message));
+  }
+  showToast(`Lead reassigned to ${newContractorName}`);
+}
+
+/**
+ * Open the reclaim confirmation dialog.
+ */
+function openReclaimModal(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const assignedName = l.contractor
+    ? ((_getContractors().find(c => c.id === l.contractor) || {}).name || l.contractor)
+    : null;
+  if (!assignedName) { showToast('Lead is already unassigned.'); return; }
+
+  openModalWith(
+    `Reclaim Lead — ${sanitizeHTML(l.name)}`,
+    `<p style="color:var(--silver);font-size:.9rem;margin:0 0 16px">This will remove the lead from <strong style="color:var(--yellow)">${sanitizeHTML(assignedName)}</strong> and return it to the unassigned admin pool. The contractor will no longer see it on their dashboard.</p>
+    <div class="form-group">
+      <label class="form-label">Reason / Note (optional)</label>
+      <input class="form-input" id="reclaim-reason-input" placeholder="e.g. Contractor not responding">
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" style="background:rgba(239,68,68,0.15);border-color:#ef4444;color:#f87171" onclick="reclaimLead('${leadId}', document.getElementById('reclaim-reason-input')?.value?.trim())">Reclaim Lead</button>`
+  );
+}
+
 
 // ─── ADD LEAD MODAL ─────────────────────────────────────────────
 function openAddLead() {

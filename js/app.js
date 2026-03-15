@@ -1513,7 +1513,7 @@ function pgAdminDashboard() {
   const newC      = leads.filter(l => l.status === 'new').length;
   const pipeline  = leads.filter(l => !['completed','lost'].includes(l.status)).length;
   const completed = leads.filter(l => l.status === 'completed').length;
-  const revenue   = leads.filter(l => l.status === 'completed').reduce((s,l) => s+l.value, 0);
+  const revenue   = leads.filter(l => l.status === 'completed').reduce((s,l) => s+_revAmount(l), 0);
   const counties  = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
   const maxC      = Math.max(...counties.map(c => leads.filter(l => l.county===c).length), 1);
   const recent    = leads.slice().reverse().slice(0,6);
@@ -1798,7 +1798,7 @@ function pgContractors() {
     ${list.map(c => {
       const cLeads     = leads.filter(l => l.contractor === c.id);
       const cCompleted = cLeads.filter(l => l.status === 'completed');
-      const cRevenue   = cCompleted.reduce((s, l) => s + l.value, 0);
+      const cRevenue   = cCompleted.reduce((s, l) => s + _revAmount(l), 0);
       const initial    = (c.companyName || c.name || '?')[0].toUpperCase();
       const inviteTag  = c.lastLoginAt
         ? `<span class="badge badge-completed" style="font-size:.68rem;margin-left:6px">Activated</span>`
@@ -1836,14 +1836,16 @@ function pgContractors() {
 function viewContractor(id) {
   const c = _getContractors().find(x => x.id === id);
   if (!c) return;
-  const cLeads = leads.filter(l => l.contractor === id);
+  const cLeads     = leads.filter(l => l.contractor === id);
+  const cCompleted = cLeads.filter(l => l.status === 'completed');
+  const cRevenue   = cCompleted.reduce((s, l) => s + _revAmount(l), 0);
   openModalWith(sanitizeHTML(c.companyName || c.name), `
     <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${sanitizeHTML(c.contactName || c.contact || '—')}</div></div>
     <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value"><a href="tel:${sanitizeHTML(c.phone)}" style="color:var(--blue-bright);text-decoration:none">${sanitizeHTML(c.phone || '—')}</a></div></div>
     <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value"><a href="mailto:${sanitizeHTML(c.email)}" style="color:var(--blue-bright);text-decoration:none">${sanitizeHTML(c.email || '—')}</a></div></div>
     <div class="detail-row"><div class="detail-label">License</div><div class="detail-value mono">${sanitizeHTML(c.license || '—')}</div></div>
     <div class="detail-row"><div class="detail-label">Coverage</div><div class="detail-value">${sanitizeHTML((c.counties||[]).join(', ') || '—')}</div></div>
-    <div class="detail-row"><div class="detail-label">Revenue</div><div class="detail-value" style="color:var(--cyan)">$${(c.revenue||0).toLocaleString()}</div></div>
+    <div class="detail-row"><div class="detail-label">Revenue</div><div class="detail-value" style="color:var(--cyan)">$${cRevenue.toLocaleString()}</div></div>
     <div class="detail-row"><div class="detail-label">Rating</div><div class="detail-value">⭐ ${c.rating || '—'}</div></div>
     <div class="detail-row"><div class="detail-label">Invite Status</div><div class="detail-value">${
       c.lastLoginAt
@@ -1854,7 +1856,7 @@ function viewContractor(id) {
           : `<button class="btn btn-sm btn-primary" id="invite-btn-modal-${c.id}" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Send Invite</button>`
     }</div></div>
     <div style="margin:16px 0 10px;font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:700">Assigned Leads (${cLeads.length})</div>
-    ${cLeads.length === 0 ? '<div style="color:var(--gray);font-size:.85rem">No leads assigned yet.</div>' : cLeads.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(30,45,74,0.4)"><div><div style="font-size:.85rem;font-weight:500">${sanitizeHTML(l.name)}</div><div style="font-size:.75rem;color:var(--gray)">${sanitizeHTML(l.county)},${sanitizeHTML(l.state)} · $${l.value.toLocaleString()}</div></div><span class="badge badge-${l.status}">${cap(l.status)}</span></div>`).join('')}`,
+    ${cLeads.length === 0 ? '<div style="color:var(--gray);font-size:.85rem">No leads assigned yet.</div>' : cLeads.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(30,45,74,0.4)"><div><div style="font-size:.85rem;font-weight:500">${sanitizeHTML(l.name)}</div><div style="font-size:.75rem;color:var(--gray)">${sanitizeHTML(l.county)},${sanitizeHTML(l.state)} · $${_revAmount(l).toLocaleString()}${l.quoteAmount != null ? ' <span style="color:#a78bfa">(quoted)</span>' : ''}</div></div><span class="badge badge-${l.status}">${cap(l.status)}</span></div>`).join('')}`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Close</button>`);
 }
 
@@ -2120,10 +2122,20 @@ async function confirmDeleteContractor(id) {
   showToast('Contractor removed.');
 }
 
+// ─── REVENUE HELPERS ────────────────────────────────────────────
+/**
+ * True revenue amount for a lead.
+ * Priority: contractor-entered quote > original estimated value.
+ * Estimated value is NEVER used as final revenue once a real quote exists.
+ */
+function _revAmount(l) {
+  return l.quoteAmount != null ? Number(l.quoteAmount) : (l.value || 0);
+}
+
 // ─── REVENUE ────────────────────────────────────────────────────
 function pgRevenue() {
   const done  = leads.filter(l=>l.status==='completed');
-  const total = done.reduce((s,l)=>s+l.value,0);
+  const total = done.reduce((s,l)=>s+_revAmount(l),0);
   const fee   = Math.round(total * settings.commissionPct/100);
   const bars  = [3200,4800,5100,6200,7400,total];
   const months= ['Oct','Nov','Dec','Jan','Feb','Mar'];
@@ -2145,7 +2157,7 @@ function pgRevenue() {
       </div>
       <div class="card"><div class="card-header"><span>🔧</span><div class="card-title">By Contractor</div></div>
         <div class="card-body">
-          ${(()=>{ const cs=_getContractors(); const maxRev=Math.max(...cs.map(x=>x.revenue),1); return cs.map(c=>`<div class="county-row"><div class="county-name" style="width:140px">${c.name}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(c.revenue/maxRev*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(c.revenue/1000).toFixed(1)}k</div></div>`).join(''); })()}
+          ${(()=>{ const cs=_getContractors(); const cRevMap={}; done.forEach(l=>{ if(l.contractor) cRevMap[l.contractor]=(cRevMap[l.contractor]||0)+_revAmount(l); }); const maxRev=Math.max(...cs.map(x=>cRevMap[x.id]||0),1); return cs.map(c=>{ const rev=cRevMap[c.id]||0; return `<div class="county-row"><div class="county-name" style="width:140px">${sanitizeHTML(c.companyName||c.name)}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(rev/maxRev*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(rev/1000).toFixed(1)}k</div></div>`; }).join(''); })()}
           <div style="margin-top:16px;font-size:.8rem;color:var(--gray)">Platform fee per contractor at ${settings.commissionPct}% commission rate</div>
         </div>
       </div>
@@ -2154,7 +2166,7 @@ function pgRevenue() {
       <div class="card-header"><span>✅</span><div class="card-title">Completed Jobs</div></div>
       ${done.length===0?`<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No completed jobs yet</h3></div>`
       :`<table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Contractor</th><th>Job Value</th><th>Platform Fee</th><th>Date</th></tr></thead><tbody>
-        ${done.map(l=>{const c=_getContractors().find(x=>x.id===l.contractor); return `<tr><td>${l.name}</td><td>${l.county},${l.state}</td><td style="font-size:.8rem">${l.service}</td><td style="font-size:.82rem">${c?c.name:'—'}</td><td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td><td style="color:var(--cyan)">$${Math.round(l.value*settings.commissionPct/100).toLocaleString()}</td><td style="font-size:.8rem;color:var(--gray)">${l.created}</td></tr>`;}).join('')}
+        ${done.map(l=>{const c=_getContractors().find(x=>x.id===l.contractor); const rv=_revAmount(l); const isQuoted=l.quoteAmount!=null; return `<tr><td>${l.name}</td><td>${l.county},${l.state}</td><td style="font-size:.8rem">${l.service}</td><td style="font-size:.82rem">${c?sanitizeHTML(c.companyName||c.name):'—'}</td><td style="color:var(--green);font-weight:600">$${rv.toLocaleString()}${isQuoted?'<span style="font-size:.65rem;color:#a78bfa;margin-left:4px">quoted</span>':''}</td><td style="color:var(--cyan)">$${Math.round(rv*settings.commissionPct/100).toLocaleString()}</td><td style="font-size:.8rem;color:var(--gray)">${l.created}</td></tr>`;}).join('')}
       </tbody></table>`}
     </div>
   </div>`;

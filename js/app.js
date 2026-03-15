@@ -2982,20 +2982,21 @@ async function sendMonthlyReport(period) {
   // Build report data from in-memory state
   const range       = _dateRange(period);
   const demoIds     = _demoContractorIds();
-  const realLeads   = leads.filter(l => !demoIds.has(l.contractorId));
-  const periodLeads = realLeads.filter(l => _inRange(l.createdAt || l.date, range));
-  const wonLeads    = realLeads.filter(l => l.status === 'completed' && _inRange(l.wonAt || l.date, range));
+  // Use l.contractor — the field name set by _rowToLead() mapping contractor_id
+  const realLeads   = leads.filter(l => !demoIds.has(l.contractor));
+  const periodLeads = realLeads.filter(l => _inRange(l.createdAt, range));
+  const wonLeads    = realLeads.filter(l => l.status === 'completed' && _inRange(l.wonAt || l.createdAt, range));
 
   const totalRevenue    = wonLeads.reduce((s, l) => s + _revenueValue(l), 0);
   const platformCut     = totalRevenue * ((settings.commissionPct || 15) / 100);
   const newLeadsCount   = periodLeads.length;
   const completedCount  = wonLeads.length;
 
-  // Per-contractor breakdown (real only)
-  const realCtrs = _realContractors().filter(c => c.isActive !== false);
+  // Per-contractor breakdown: all real contractors (including inactive — historical activity still counts)
+  const realCtrs = _realContractors();
   const ctrRows  = realCtrs.map(c => {
-    const cLeads = periodLeads.filter(l => l.contractorId === c.id);
-    const cWon   = wonLeads.filter(l => l.contractorId === c.id);
+    const cLeads = periodLeads.filter(l => l.contractor === c.id);
+    const cWon   = wonLeads.filter(l => l.contractor === c.id);
     const cRev   = cWon.reduce((s, l) => s + _revenueValue(l), 0);
     return { name: c.name, leads: cLeads.length, won: cWon.length, revenue: cRev };
   }).filter(r => r.leads > 0 || r.won > 0);

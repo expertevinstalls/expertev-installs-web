@@ -321,6 +321,47 @@ async function sbFetchAssignmentHistory(leadId) {
   return data;
 }
 
+/**
+ * Log a single activity event against a lead.
+ * actorType: 'admin' | 'contractor' | 'system'
+ * actorId:   admin email or contractor DB id
+ * actorName: human-readable display name
+ * Fire-and-forget — never await this in critical paths.
+ */
+async function sbLogActivity(leadId, actionType, previousValue, newValue, actorType, actorId, actorName) {
+  const db = _db();
+  if (!db) return null;
+  const { error } = await db
+    .from('lead_activity')
+    .insert([{
+      lead_id:        leadId,
+      action_type:    actionType,
+      previous_value: previousValue || '',
+      new_value:      newValue       || '',
+      actor_type:     actorType      || '',
+      actor_id:       actorId        || '',
+      actor_name:     actorName      || '',
+    }]);
+  if (error) { console.error('[Supabase] logActivity:', error.message); return null; }
+  return { lead_id: leadId, action_type: actionType };
+}
+
+/**
+ * Fetch all activity events for a lead, newest first.
+ * Returns array of rows or null.
+ */
+async function sbFetchActivity(leadId) {
+  const db = _db();
+  if (!db) return null;
+  const { data, error } = await db
+    .from('lead_activity')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('[Supabase] fetchActivity:', error.message); return null; }
+  return data;
+}
+
 
 /* ── 5. NOTES ─────────────────────────────────────────────── */
 

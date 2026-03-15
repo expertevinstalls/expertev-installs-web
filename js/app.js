@@ -1745,6 +1745,9 @@ async function assignLead(lid) {
   }
 
   // Only update local state + show success after DB confirms (or if Supabase not configured)
+  const _prevContractorForActivity = lead.contractor
+    ? ((_getContractors().find(c => c.id === lead.contractor) || {}).name || lead.contractor)
+    : 'Unassigned';
   lead.status = 'assigned';
   lead.contractor = sel.value;
   addNote(lid, 'Admin', `Assigned to ${contractorName}.`);
@@ -1752,6 +1755,11 @@ async function assignLead(lid) {
   persist();
   showToast('Lead assigned to ' + contractorName);
   addNotification(`Lead assigned to <strong>${sanitizeHTML(contractorName)}</strong> — ${sanitizeHTML(lead.name)}`);
+  if (isSupabaseReady()) {
+    const _a = _actorInfo();
+    sbLogActivity(lid, 'lead_assigned', _prevContractorForActivity, contractorName, _a.type, _a.id, _a.name)
+      .catch(e => console.error('[DB] logActivity (assignLead):', e.message));
+  }
 }
 
 // ─── CONTRACTORS ─────────────────────────────────────────────────────────────
@@ -2684,6 +2692,7 @@ function openLeadDetail(id) {
       <button class="tab-btn active" onclick="switchTab(event,'tab-intel')">⚡ Job Intelligence</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-details')">Details</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-notes')">Notes (${l.notes.length})</button>
+      <button class="tab-btn" onclick="switchTab(event,'tab-activity');_loadActivity('${l.id}')">Activity</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-actions')">✏️ Edit Lead</button>
     </div>
     <div class="tab-panel active" id="tab-intel">
@@ -2796,6 +2805,11 @@ function openLeadDetail(id) {
         <button class="btn btn-primary btn-sm" onclick="submitNote('${id}')">Add</button>
       </div>
     </div>
+    <div class="tab-panel" id="tab-activity">
+      <div id="activity-panel-${l.id}" style="padding:8px 0;color:var(--gray);font-size:.85rem;text-align:center">
+        Click the Activity tab to load history.
+      </div>
+    </div>
     <div class="tab-panel" id="tab-actions">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Customer Name</label><input class="form-input" id="medit-name" value="${sanitizeHTML(l.name)}"></div>
@@ -2877,6 +2891,11 @@ function _saveInlineQuote(leadId) {
   if (!rawAmt || rawAmt <= 0 || isNaN(rawAmt)) { showToast('Enter a valid amount > $0'); return; }
   const notes = document.getElementById('inline-quote-notes')?.value?.trim() ?? '';
 
+  const _prevAmt = l.quoteAmount;
+  const _actType = _prevAmt != null ? 'quote_updated' : 'quote_sent';
+  const _prevVal = _prevAmt != null ? `$${Number(_prevAmt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '';
+  const _newVal  = `$${rawAmt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
   l.quoteAmount    = rawAmt;
   l.quoteNotes     = sanitizeHTML(notes);
   l.quoteUpdatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -2886,8 +2905,86 @@ function _saveInlineQuote(leadId) {
     sbSaveQuote(leadId, rawAmt, l.quoteNotes, l.quoteUpdatedBy)
       .then(r => { if (!r) console.error('[DB] _saveInlineQuote returned null for', leadId); })
       .catch(e => console.error('[DB] _saveInlineQuote:', e.message));
+    const _a = _actorInfo();
+    sbLogActivity(leadId, _actType, _prevVal, _newVal, _a.type, _a.id, _a.name)
+      .catch(e => console.error('[DB] logActivity (_saveInlineQuote):', e.message));
   }
   showToast('Quote amount saved ✓');
+}
+
+/** Returns { type, id, name } for the currently signed-in user — used for activity logging. */
+function _actorInfo() {
+  if (!currentUser) return { type: 'system', id: '', name: 'System' };
+  return {
+    type: currentUser.role === 'admin' ? 'admin' : 'contractor',
+    id:   currentUser.email || currentUser.id || '',
+    name: currentUser.name  || currentUser.email || currentUser.id || '',
+  };
+}
+
+/**
+ * Lazy-load and render the activity timeline for a lead.
+ * Called when the user clicks the Activity tab.
+ */
+async function _loadActivity(leadId) {
+  const panel = document.getElementById('activity-panel-' + leadId);
+  if (!panel) return;
+  panel.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray);font-size:.85rem">Loading activity…</div>`;
+
+  const rows = isSupabaseReady() ? await sbFetchActivity(leadId) : null;
+
+  if (!rows || rows.length === 0) {
+    panel.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray);font-size:.85rem">No activity recorded yet.<br><span style="font-size:.78rem">Activity is logged from this point forward.</span></div>`;
+    return;
+  }
+
+  const cfg = {
+    lead_created:    { icon: '📋', label: 'Lead Created',         color: '#22d3ee' },
+    lead_assigned:   { icon: '🔄', label: 'Lead Assigned',        color: '#fbbf24' },
+    lead_reclaimed:  { icon: '↩',  label: 'Reclaimed by Admin',   color: '#fb923c' },
+    lead_reassigned: { icon: '🔀', label: 'Lead Reassigned',      color: '#fbbf24' },
+    contacted:       { icon: '📞', label: 'Marked Contacted',     color: '#60a5fa' },
+    scheduled:       { icon: '📅', label: 'Estimate Scheduled',   color: '#c084fc' },
+    quote_sent:      { icon: '📄', label: 'Quote Sent',           color: '#a78bfa' },
+    quote_updated:   { icon: '✏️', label: 'Quote Updated',        color: '#a78bfa' },
+    job_won:         { icon: '✅', label: 'Job Won',               color: '#4ade80' },
+    job_lost:        { icon: '❌', label: 'Job Lost',              color: '#f87171' },
+  };
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  const items = rows.map(row => {
+    const c = cfg[row.action_type] || { icon: '•', label: row.action_type, color: 'var(--gray)' };
+    const ts = row.created_at
+      ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '';
+    const actorBadge = row.actor_type === 'admin'
+      ? `<span style="font-size:.68rem;padding:1px 7px;border-radius:10px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:#fbbf24">Admin</span>`
+      : row.actor_type === 'contractor'
+        ? `<span style="font-size:.68rem;padding:1px 7px;border-radius:10px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc">Contractor</span>`
+        : `<span style="font-size:.68rem;padding:1px 7px;border-radius:10px;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);color:var(--gray)">System</span>`;
+    const actorLine = row.actor_name
+      ? `<div style="font-size:.78rem;color:var(--silver);margin-top:2px">${sanitizeHTML(row.actor_name)}${isAdmin && row.actor_id && row.actor_id !== row.actor_name ? ` <span style="color:var(--gray);font-size:.72rem">(${sanitizeHTML(row.actor_id)})</span>` : ''}</div>`
+      : '';
+    const changeLine = (row.previous_value || row.new_value)
+      ? `<div style="font-size:.8rem;color:var(--silver);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${row.previous_value ? `<span style="color:var(--gray);text-decoration:line-through">${sanitizeHTML(row.previous_value)}</span><span style="color:var(--gray)">→</span>` : ''}<span style="color:var(--white);font-weight:600">${sanitizeHTML(row.new_value)}</span></div>`
+      : '';
+    return `
+      <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(30,45,74,.5)">
+        <div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:${c.color}18;border:1px solid ${c.color}40;display:flex;align-items:center;justify-content:center;font-size:.85rem;margin-top:2px">${c.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+            <span style="font-size:.88rem;font-weight:700;color:${c.color}">${sanitizeHTML(c.label)}</span>
+            ${actorBadge}
+          </div>
+          ${actorLine}
+          ${changeLine}
+          <div style="font-size:.72rem;color:var(--gray);margin-top:4px">${sanitizeHTML(ts)}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `<div style="max-height:420px;overflow-y:auto;padding-right:4px">${items}</div>`;
 }
 
 function switchTab(e, id) {
@@ -2952,7 +3049,20 @@ function saveModal(id) {
   const s = document.getElementById('mstatus');
   if (s) { l.status = s.value; if (s.value === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
   const c = document.getElementById('mcontractor');
-  if (c) { l.contractor = c.value || null; if (c.value) addNote(id, 'Admin', `Assigned to ${(_getContractors().find(x=>x.id===c.value)||{}).name}.`); }
+  if (c) {
+    const _prevCId = l.contractor;
+    const _prevCName = _prevCId ? ((_getContractors().find(x=>x.id===_prevCId)||{}).name||_prevCId) : 'Unassigned';
+    l.contractor = c.value || null;
+    if (c.value) {
+      const _newCName = (_getContractors().find(x=>x.id===c.value)||{}).name || c.value;
+      addNote(id, 'Admin', `Assigned to ${_newCName}.`);
+      if (isSupabaseReady() && c.value !== _prevCId) {
+        const _a = _actorInfo();
+        sbLogActivity(id, 'lead_assigned', _prevCName, _newCName, _a.type, _a.id, _a.name)
+          .catch(e => console.error('[DB] logActivity (saveModal assignment):', e.message));
+      }
+    }
+  }
   const p = document.getElementById('mpriority');
   if (p) l.priority = p.value;
   if (l.status === 'completed' && prevStatus !== 'completed') _onLeadCompleted(l);
@@ -2984,12 +3094,13 @@ function saveModal(id) {
 
 function upd(id, status) {
   const l = leads.find(x => x.id === id);
+  let prevStatus = null;
   if (l) {
-    const prev = l.status;
+    prevStatus = l.status;
     l.status = status;
     if (status === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     addNote(id, currentUser.name, `Status changed to ${cap(status)}.`);
-    if (status === 'completed' && prev !== 'completed') _onLeadCompleted(l);
+    if (status === 'completed' && prevStatus !== 'completed') _onLeadCompleted(l);
   }
   /* Refresh whichever view is currently active */
   if (document.getElementById('page-my-leads')?.classList.contains('active'))  renderMyLeads();
@@ -3001,6 +3112,17 @@ function upd(id, status) {
     sbUpdateLeadStatus(id, status).then(r => {
       if (!r) console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, status, result: 'failure', error: 'updateLeadStatus returned null — likely RLS policy' }));
     }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, error: e.message })));
+
+    // Activity log — map status to action_type (skip quote-sent, handled by saveQuoteModal)
+    const _actMap = { contacted:'contacted', scheduled:'scheduled', completed:'job_won', lost:'job_lost' };
+    const _actType = _actMap[status];
+    if (_actType) {
+      const _a = _actorInfo();
+      const _prevLabel = prevStatus ? cap(prevStatus) : '';
+      const _newLabel  = { contacted:'Contacted', scheduled:'Est. Scheduled', completed:'Job Won', lost:'Job Lost' }[status] || cap(status);
+      sbLogActivity(id, _actType, _prevLabel, _newLabel, _a.type, _a.id, _a.name)
+        .catch(e => console.error('[DB] logActivity (upd):', e.message));
+    }
   }
   showToast('Status updated → ' + cap(status));
 }
@@ -3061,6 +3183,12 @@ function saveQuoteModal(leadId, skip) {
     }
     const notes = document.getElementById('quote-notes-input')?.value?.trim() ?? '';
 
+    // Capture previous amount before overwriting (for activity log)
+    const _prevAmt = l.quoteAmount;
+    const _actType = _prevAmt != null ? 'quote_updated' : 'quote_sent';
+    const _prevVal = _prevAmt != null ? `$${Number(_prevAmt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '';
+    const _newVal  = `$${rawAmt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
     // Update in-memory lead immediately so UI reflects it without waiting for DB
     l.quoteAmount    = rawAmt;
     l.quoteNotes     = sanitizeHTML(notes);
@@ -3074,6 +3202,9 @@ function saveQuoteModal(leadId, skip) {
           else console.log('[DB] Quote saved ✓', leadId, rawAmt);
         })
         .catch(e => console.error('[DB] sbSaveQuote error:', e.message));
+      const _a = _actorInfo();
+      sbLogActivity(leadId, _actType, _prevVal, _newVal, _a.type, _a.id, _a.name)
+        .catch(e => console.error('[DB] logActivity (saveQuoteModal):', e.message));
     }
   }
 
@@ -3119,6 +3250,9 @@ function reclaimLead(leadId, reason) {
       .catch(e => console.error('[DB] reclaimLead:', e.message));
     sbLogAssignmentHistory(leadId, prevContractorId, null, currentUser?.email || currentUser?.name || 'Admin', reason || '')
       .catch(e => console.error('[DB] logAssignmentHistory (reclaim):', e.message));
+    const _a = _actorInfo();
+    sbLogActivity(leadId, 'lead_reclaimed', prevContractorName, 'Unassigned (Admin Pool)', _a.type, _a.id, _a.name)
+      .catch(e => console.error('[DB] logActivity (reclaimLead):', e.message));
   }
   showToast(`Lead reclaimed — returned to unassigned pool`);
 }
@@ -3198,6 +3332,9 @@ function saveReassign(leadId) {
       .catch(e => console.error('[DB] saveReassign:', e.message));
     sbLogAssignmentHistory(leadId, prevContractorId, newContractorId, currentUser?.email || currentUser?.name || 'Admin', reason)
       .catch(e => console.error('[DB] logAssignmentHistory (reassign):', e.message));
+    const _a = _actorInfo();
+    sbLogActivity(leadId, 'lead_reassigned', prevContractorName, newContractorName, _a.type, _a.id, _a.name)
+      .catch(e => console.error('[DB] logActivity (saveReassign):', e.message));
   }
   showToast(`Lead reassigned to ${newContractorName}`);
 }
@@ -3278,8 +3415,14 @@ function saveNewLead() {
   leads.push(newLead);
   persist();
   if (isSupabaseReady()) {
+    const _a = _actorInfo();
     sbCreateLead(newLead).then(r => {
-      if (!r) console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, result: 'failure', error: 'createLead returned null — likely RLS policy. Run schema_v3_rls_fix.sql.' }));
+      if (!r) {
+        console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, result: 'failure', error: 'createLead returned null — likely RLS policy. Run schema_v3_rls_fix.sql.' }));
+      } else {
+        sbLogActivity(newLead.id, 'lead_created', '', `${newLead.service} — Est. $${newLead.value.toLocaleString()}`, _a.type, _a.id, _a.name)
+          .catch(e => console.error('[DB] logActivity (saveNewLead):', e.message));
+      }
     }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, error: e.message })));
   }
   closeModalDirect();

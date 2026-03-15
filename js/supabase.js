@@ -457,6 +457,54 @@ async function sbMarkNotificationsRead() {
   if (error) console.error('[Supabase] markNotificationsRead:', error.message);
 }
 
+/**
+ * Write a contractor-specific notification.
+ * contractorId: contractors table PK (TEXT) for the target contractor.
+ * title: short heading, e.g. "New lead assigned"
+ * text:  detail line, e.g. "EV charger install in Cherry Hill"
+ */
+async function sbAddContractorNotification(contractorId, title, text) {
+  const db = _db();
+  if (!db) return null;
+  const { error } = await db
+    .from('notifications')
+    .insert([{ contractor_id: contractorId, title, text, time: 'Just now', read: false }]);
+  if (error) { console.error('[SUPABASE] addContractorNotification:', error.message); return null; }
+  console.log('[SUPABASE] addContractorNotification ✓', JSON.stringify({ contractor_id: contractorId, title }));
+  return { contractor_id: contractorId, title, text, time: 'Just now', read: false };
+}
+
+/**
+ * Fetch contractor-specific notifications (contractor_id = contractorId).
+ * Returns newest-first array or null on error.
+ */
+async function sbFetchContractorNotifications(contractorId) {
+  const db = _db();
+  if (!db) return null;
+  const { data, error } = await db
+    .from('notifications')
+    .select('*')
+    .eq('contractor_id', contractorId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) { console.error('[Supabase] fetchContractorNotifications:', error.message); return null; }
+  return data;
+}
+
+/**
+ * Mark all unread contractor notifications as read.
+ */
+async function sbMarkContractorNotificationsRead(contractorId) {
+  const db = _db();
+  if (!db) return;
+  const { error } = await db
+    .from('notifications')
+    .update({ read: true })
+    .eq('contractor_id', contractorId)
+    .eq('read', false);
+  if (error) console.error('[Supabase] markContractorNotificationsRead:', error.message);
+}
+
 
 /* ── 7. SETTINGS ──────────────────────────────────────────── */
 
@@ -555,6 +603,7 @@ function _leadToRow(lead) {
     quote_notes:      lead.quoteNotes       ?? '',
     quote_updated_at: lead.quoteUpdatedAt   ? _parseDisplayDate(lead.quoteUpdatedAt) : null,
     quote_updated_by: lead.quoteUpdatedBy   ?? '',
+    call_notes:       lead.callNotes        ?? '',
     created_display:  lead.created          ?? '',
     // created_at intentionally omitted — DB sets it via DEFAULT NOW()
   };
@@ -609,6 +658,7 @@ function _rowToLead(row, notes) {
       ? new Date(row.quote_updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : null,
     quoteUpdatedBy:  row.quote_updated_by ?? '',
+    callNotes:       row.call_notes       ?? '',
     created:         row.created_display  ||
       new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     notes: noteRows.map(n => ({

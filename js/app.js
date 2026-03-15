@@ -1317,12 +1317,25 @@ function initApp() {
     leads.splice(0, leads.length);
   }
 
-  // BUG-FIX: Contractors get a clean notification slate on every login.
-  // Admin-level and demo notifications are irrelevant to their pipeline.
-  // Their session notifications will build up organically as events occur.
+  // Contractors get a clean notification slate on every login, then load
+  // their contractor-specific notifications from the DB.
   if (currentUser.role === 'contractor') {
     notifications.splice(0, notifications.length);
     persist();
+    if (isSupabaseReady() && currentUser.id) {
+      sbFetchContractorNotifications(currentUser.id).then(rows => {
+        if (!Array.isArray(rows)) return;
+        notifications.splice(0, notifications.length, ...rows.map(r => ({
+          id:    r.id,
+          title: r.title || '',
+          text:  r.text  || '',
+          time:  r.time  || 'Just now',
+          read:  r.read  ?? false,
+        })));
+        renderNotifDot();
+        renderNotifList();
+      }).catch(e => console.error('[NOTIF] fetch contractor notifications:', e.message));
+    }
   }
 
   renderNotifDot();
@@ -1755,6 +1768,7 @@ async function assignLead(lid) {
   persist();
   showToast('Lead assigned to ' + contractorName);
   addNotification(`Lead assigned to <strong>${sanitizeHTML(contractorName)}</strong> — ${sanitizeHTML(lead.name)}`);
+  _triggerAssignmentNotification(lead, sel.value);
   if (isSupabaseReady()) {
     const _a = _actorInfo();
     sbLogActivity(lid, 'lead_assigned', _prevContractorForActivity, contractorName, _a.type, _a.id, _a.name)
@@ -2792,6 +2806,7 @@ function openLeadDetail(id) {
           ${l.contactedAt ? `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--green)">${l.contactedAt}</div></div>` : `<div class="detail-row"><div class="detail-label">Contacted</div><div class="detail-value" style="color:var(--red)">Not yet</div></div>`}
         </div>
       </div>
+      ${l.callNotes ? `<div style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px 16px;margin-top:12px"><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:6px">📞 Call Notes</div><div style="font-size:.88rem;color:var(--silver);line-height:1.6;white-space:pre-wrap">${sanitizeHTML(l.callNotes)}</div></div>` : ''}
       ${(()=>{ const cn = l.notes.find(n => n.author === 'Customer'); return cn ? `<div style="background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:8px;padding:12px 16px;margin-top:12px"><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blue-bright);margin-bottom:6px">Customer Notes</div><div style="font-size:.88rem;color:var(--silver);line-height:1.6">${sanitizeHTML(cn.text)}</div></div>` : ''; })()}
       ${l.review ? `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px 16px;margin-top:12px"><div style="font-size:.72rem;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Customer Review</div><div style="color:var(--yellow)">${'★'.repeat(l.review.rating||5)}${'☆'.repeat(5-(l.review.rating||5))} &nbsp;<span style="font-size:.8rem;color:var(--gray)">${l.review.rating||5}/5</span></div><div style="font-size:.88rem;color:var(--silver);margin-top:4px">"${sanitizeHTML(l.review.text)}"</div><div style="font-size:.75rem;color:var(--gray);margin-top:4px">${l.review.date}</div></div>` : (l.status === 'completed' ? `<div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="openReviewModal('${l.id}')">📩 Request Customer Review</button></div>` : '')}
     </div>
@@ -3056,10 +3071,13 @@ function saveModal(id) {
     if (c.value) {
       const _newCName = (_getContractors().find(x=>x.id===c.value)||{}).name || c.value;
       addNote(id, 'Admin', `Assigned to ${_newCName}.`);
-      if (isSupabaseReady() && c.value !== _prevCId) {
-        const _a = _actorInfo();
-        sbLogActivity(id, 'lead_assigned', _prevCName, _newCName, _a.type, _a.id, _a.name)
-          .catch(e => console.error('[DB] logActivity (saveModal assignment):', e.message));
+      if (c.value !== _prevCId) {
+        _triggerAssignmentNotification(l, c.value);
+        if (isSupabaseReady()) {
+          const _a = _actorInfo();
+          sbLogActivity(id, 'lead_assigned', _prevCName, _newCName, _a.type, _a.id, _a.name)
+            .catch(e => console.error('[DB] logActivity (saveModal assignment):', e.message));
+        }
       }
     }
   }
@@ -3326,6 +3344,7 @@ function saveReassign(leadId) {
   const noteText = `Reassigned by admin from ${prevContractorName} → ${newContractorName}.${reason ? ' Reason: ' + sanitizeHTML(reason) : ''}`;
   addNote(leadId, currentUser.name || 'Admin', noteText);
 
+  _triggerAssignmentNotification(l, newContractorId);
   if (isSupabaseReady()) {
     sbAssignLead(leadId, newContractorId)
       .then(r => { if (!r) console.error('[DB] saveReassign: sbAssignLead returned null'); })
@@ -3363,11 +3382,33 @@ function openReclaimModal(leadId) {
 }
 
 
+// ─── LEAD EVENT TRIGGERS ─────────────────────────────────────────
+/**
+ * Fire an in-app notification to the target contractor when a lead is assigned.
+ * Called from saveNewLead(), assignLead(), saveModal(), and saveReassign().
+ * Future email/SMS hooks should be added here — not scattered in individual callers.
+ *
+ * @param {object} lead         - Full lead object (county, service, name etc.)
+ * @param {string} contractorId - Target contractor's DB id (contractors.id)
+ */
+function _triggerAssignmentNotification(lead, contractorId) {
+  if (!contractorId) return;
+  const title = 'New lead assigned';
+  const text  = `${sanitizeHTML(lead.service)} in ${sanitizeHTML(lead.county)} — ${sanitizeHTML(lead.name)}`;
+  if (isSupabaseReady()) {
+    sbAddContractorNotification(contractorId, title, text)
+      .catch(e => console.error('[NOTIF] contractor notification failed:', e.message));
+  }
+  // Future hook: sendAssignmentEmail(lead, contractorId)
+  // Future hook: sendAssignmentSMS(lead, contractorId)
+}
+
 // ─── ADD LEAD MODAL ─────────────────────────────────────────────
 function openAddLead() {
+  const contractors = _getContractors();
   openModalWith('Add New Lead',`
     <div class="grid-2" style="gap:12px">
-      <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="nl-name" placeholder="Full name"></div>
+      <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="nl-name" placeholder="Full name" autofocus></div>
       <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="nl-phone" placeholder="(xxx) xxx-xxxx"></div>
     </div>
     <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="nl-email" type="email"></div>
@@ -3376,20 +3417,33 @@ function openAddLead() {
       <div class="form-group"><label class="form-label">County</label><select class="form-input" id="nl-county"><option>Philadelphia</option><option>Montgomery</option><option>Bucks</option><option>Chester</option><option>Delaware</option><option>Burlington</option><option>Camden</option><option>Gloucester</option></select></div>
       <div class="form-group"><label class="form-label">State</label><select class="form-input" id="nl-state"><option value="PA">Pennsylvania</option><option value="NJ">New Jersey</option></select></div>
     </div>
-    <div class="form-group"><label class="form-label">Service</label><select class="form-input" id="nl-service"><option>Level 2 Home Charger</option><option>Level 2 + Smart Panel Upgrade</option><option>Commercial Fleet Charger</option><option>Level 2 Condo Install</option><option>Level 2 Outlet Upgrade</option></select></div>
+    <div class="grid-2" style="gap:12px">
+      <div class="form-group"><label class="form-label">Service</label><select class="form-input" id="nl-service"><option>Level 2 Home Charger</option><option>Level 2 + Smart Panel Upgrade</option><option>Commercial Fleet Charger</option><option>Level 2 Condo Install</option><option>Level 2 Outlet Upgrade</option></select></div>
+      <div class="form-group"><label class="form-label">Priority</label><select class="form-input" id="nl-priority"><option value="normal">Normal</option><option value="high">High</option></select></div>
+    </div>
     <div class="grid-2" style="gap:12px">
       <div class="form-group"><label class="form-label">Est. Value ($)</label><input class="form-input" id="nl-value" type="number" placeholder="1200"></div>
-      <div class="form-group"><label class="form-label">Priority</label><select class="form-input" id="nl-priority"><option value="normal">Normal</option><option value="high">High</option></select></div>
+      <div class="form-group"><label class="form-label">Assign To <span style="font-weight:400;color:var(--gray)">(optional)</span></label>
+        <select class="form-input" id="nl-contractor">
+          <option value="">— Unassigned —</option>
+          ${contractors.map(c=>`<option value="${c.id}">${sanitizeHTML(c.companyName||c.name||c.id)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Call Notes <span style="font-weight:400;color:var(--gray)">(optional)</span></label>
+      <textarea class="form-input" id="nl-call-notes" rows="3" placeholder="Panel location, customer notes, call context, rebate questions…" style="resize:vertical"></textarea>
     </div>`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button><button class="btn btn-primary" onclick="saveNewLead()">Add Lead →</button>`);
 }
 function saveNewLead() {
   const rawName = document.getElementById('nl-name')?.value?.trim();
   if (!rawName) { showToast('Please enter a customer name'); return; }
-  const name     = sanitizeHTML(rawName);
-  const county   = sanitizeHTML(document.getElementById('nl-county').value);
-  const state    = sanitizeHTML(document.getElementById('nl-state').value);
-  const service  = sanitizeHTML(document.getElementById('nl-service').value);
+  const name       = sanitizeHTML(rawName);
+  const county     = sanitizeHTML(document.getElementById('nl-county').value);
+  const state      = sanitizeHTML(document.getElementById('nl-state').value);
+  const service    = sanitizeHTML(document.getElementById('nl-service').value);
+  const callNotes  = sanitizeHTML((document.getElementById('nl-call-notes')?.value || '').trim());
+  const assignTo   = document.getElementById('nl-contractor')?.value || '';
   const newLead  = {
     id: 'L' + String(Date.now()).slice(-6),
     name, phone: sanitizeHTML(document.getElementById('nl-phone').value),
@@ -3398,9 +3452,11 @@ function saveNewLead() {
     county, state, service,
     panel:'200A', charger:'TBD',
     rebate: state==='NJ' ? 'PSE&G $250' : 'PECO $250',
-    status:'new', contractor:null,
+    status: assignTo ? 'assigned' : 'new',
+    contractor: assignTo || null,
     created: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
     value: parseInt(document.getElementById('nl-value').value) || 1200,
+    callNotes,
     notes:[], priority: document.getElementById('nl-priority').value,
     complexity: service.toLowerCase().includes('commercial') ? 'Commercial Install' : 'Basic Installation',
     panelSize: '200amp', distance: 'notsure',
@@ -3422,14 +3478,28 @@ function saveNewLead() {
       } else {
         sbLogActivity(newLead.id, 'lead_created', '', `${newLead.service} — Est. $${newLead.value.toLocaleString()}`, _a.type, _a.id, _a.name)
           .catch(e => console.error('[DB] logActivity (saveNewLead):', e.message));
+        if (assignTo) {
+          const contractorName = (_getContractors().find(c=>c.id===assignTo)||{}).name || assignTo;
+          sbLogActivity(newLead.id, 'lead_assigned', 'Unassigned', contractorName, _a.type, _a.id, _a.name)
+            .catch(e => console.error('[DB] logActivity (saveNewLead assign):', e.message));
+          _triggerAssignmentNotification(newLead, assignTo);
+        }
       }
     }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_insert', source: 'manual_entry', lead_id: newLead.id, error: e.message })));
+  }
+  // Add assignment note to thread after lead exists locally
+  if (assignTo) {
+    const contractorName = (_getContractors().find(c=>c.id===assignTo)||{}).name || assignTo;
+    addNote(newLead.id, 'Admin', `Assigned to ${contractorName}.`);
   }
   closeModalDirect();
   renderLeadsTable(); buildSidebar();
   refreshAdminDashboard();
-  addNotification(`New lead added manually: <strong>${sanitizeHTML(name)}</strong>`);
-  showToast('Lead added — ' + name);
+  const assignedName = assignTo ? ((_getContractors().find(c=>c.id===assignTo)||{}).name || assignTo) : null;
+  addNotification(assignedName
+    ? `New lead assigned to <strong>${sanitizeHTML(assignedName)}</strong> — ${sanitizeHTML(name)}`
+    : `New lead added: <strong>${sanitizeHTML(name)}</strong>`);
+  showToast(assignedName ? `Lead added and assigned to ${assignedName}` : 'Lead added — ' + name);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3444,13 +3514,31 @@ function renderNotifList() {
   const list = document.getElementById('notif-list');
   if (!list) return;
   if (notifications.length === 0) { list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray);font-size:.85rem">No notifications</div>`; return; }
-  list.innerHTML = notifications.map(n=>`<div class="notif-item" style="${!n.read?'background:rgba(59,130,246,0.05)':''}"><span style="font-size:.83rem">${n.text}</span><div class="notif-time">${n.time}</div></div>`).join('');
+  list.innerHTML = notifications.map(n=>`<div class="notif-item" style="${!n.read?'background:rgba(59,130,246,0.05)':''}">
+    ${n.title ? `<div style="font-size:.8rem;font-weight:600;color:var(--blue);margin-bottom:3px">${n.title}</div>` : ''}
+    <span style="font-size:.83rem">${n.text}</span>
+    <div class="notif-time">${n.time}</div>
+  </div>`).join('');
 }
 function toggleNotif() {
   notifOpen = !notifOpen;
   const panel = document.getElementById('notif-panel');
   panel.classList.toggle('open', notifOpen);
-  if (notifOpen) { notifications.forEach(n=>n.read=true); renderNotifDot(); renderNotifList(); }
+  if (notifOpen) {
+    notifications.forEach(n=>n.read=true);
+    renderNotifDot();
+    renderNotifList();
+    // Mark read in DB — admin uses sbMarkNotificationsRead, contractor uses scoped version
+    if (isSupabaseReady()) {
+      if (currentUser?.role === 'contractor' && currentUser.id) {
+        sbMarkContractorNotificationsRead(currentUser.id)
+          .catch(e => console.warn('[NOTIF] mark contractor read:', e.message));
+      } else if (currentUser?.role === 'admin') {
+        sbMarkNotificationsRead()
+          .catch(e => console.warn('[NOTIF] mark admin read:', e.message));
+      }
+    }
+  }
 }
 function clearNotifs() { notifications=[]; renderNotifList(); persist(); showToast('Notifications cleared'); }
 function addNotification(text) {

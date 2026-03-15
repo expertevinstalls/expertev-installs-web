@@ -196,11 +196,22 @@ Deno.serve(async (req: Request) => {
 
     // Auto-create if still not found
     if (!contractor) {
-      console.log("[invite-contractor] No contractor record found — auto-creating for:", email);
+      // Require company_name — do NOT silently fall back to email.
+      // An unnamed contractor would inherit the email string as their company identity,
+      // which causes the wrong name to show throughout the dashboard.
+      if (!company_name?.trim()) {
+        console.error("[invite-contractor] Auto-create blocked — company_name is required but was not provided");
+        return json({
+          step: "auto_create",
+          error: "company_name is required to create a new contractor record. Please provide the company name.",
+        }, 400);
+      }
+
+      console.log("[invite-contractor] No contractor record found — auto-creating for:", email, "| company_name:", company_name);
       const insertPayload: Record<string, unknown> = {
         email,
-        name:         company_name || email,
-        company_name: company_name || email,
+        name:         company_name,
+        company_name: company_name,
         contact:      contact_name || "",
         contact_name: contact_name || "",
         services:     services     || [],

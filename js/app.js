@@ -1618,15 +1618,15 @@ function pgPipeline() {
     <div class="pipeline">
     ${stages.map(s => {
       const sl = leads.filter(l => l.status === s);
-      const totalVal = sl.reduce((x,l)=>x+l.value,0);
+      const totalVal = sl.reduce((x,l)=>x+_revAmount(l),0);
       return `<div class="pipeline-col">
         <div class="pipeline-col-header" style="border-top:2px solid ${colors[s]};padding-top:10px">${labels[s]}<span class="pipeline-count">${sl.length}</span></div>
-        ${sl.length>0?`<div style="font-size:.72rem;color:var(--green);margin-bottom:10px">$${totalVal.toLocaleString()} est.</div>`:''}
+        ${sl.length>0?`<div style="font-size:.72rem;color:var(--green);margin-bottom:10px">$${totalVal.toLocaleString()}</div>`:''}
         ${sl.length===0?`<div style="color:var(--gray);font-size:.78rem;text-align:center;padding:20px 0">No leads</div>`:''}
         ${sl.map(l=>`<div class="pipeline-card" onclick="openLeadDetail('${l.id}')">
           <div class="pipeline-card-name">${l.name}${l.priority==='high'?'<span style="color:var(--orange);margin-left:5px;font-size:.7rem">●</span>':''}</div>
           <div class="pipeline-card-detail">${l.complexity||l.service}</div>
-          <div class="pipeline-card-detail" style="color:var(--green);margin-top:3px">$${l.value.toLocaleString()}</div>
+          <div class="pipeline-card-detail" style="margin-top:3px">${_priceTag(l, true)}</div>
           <span class="pipeline-card-county">${l.county},${l.state}</span>
         </div>`).join('')}
       </div>`;
@@ -1676,7 +1676,7 @@ function renderLeadsTable() {
         <td>${l.county},${l.state}</td>
         <td style="font-size:.78rem;color:var(--gray);max-width:180px">${cn?`<span title="${sanitizeHTML(cn.text)}">${sanitizeHTML(cn.text.length>70?cn.text.slice(0,70)+'…':cn.text)}</span>`:l.service}</td>
         <td style="font-size:.78rem">${l.complexity||'—'}</td>
-        <td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td>
+        <td style="min-width:80px">${_priceTag(l)}</td>
         <td style="font-size:.82rem">${cName(l.contractor)}</td>
         <td><span class="badge badge-${l.status}">${cap(l.status)}</span></td>
         <td style="font-size:.8rem;color:var(--gray)">${l.created}</td>
@@ -2130,6 +2130,37 @@ async function confirmDeleteContractor(id) {
  */
 function _revAmount(l) {
   return l.quoteAmount != null ? Number(l.quoteAmount) : (l.value || 0);
+}
+
+/**
+ * Returns the best available display price for a lead as an HTML snippet.
+ * Priority:  Final (won + quote)  >  Quoted  >  Estimated
+ * Usage: insert directly into table cells or pipeline cards.
+ *
+ * @param {object} l  - lead object
+ * @param {boolean} [compact=false] - use a tighter layout for pipeline cards
+ */
+function _priceTag(l, compact) {
+  let amount, label, color, labelColor;
+  if (l.quoteAmount != null) {
+    amount     = Number(l.quoteAmount);
+    const isWon = l.status === 'completed';
+    label      = isWon ? 'Final' : 'Quoted';
+    color      = isWon ? 'var(--green)' : '#a78bfa';
+    labelColor = isWon ? '#4ade80' : '#c4b5fd';
+  } else {
+    amount     = l.value || 0;
+    label      = 'Est.';
+    color      = 'var(--green)';
+    labelColor = '#6ee7b7';
+  }
+  const fmt = amount.toLocaleString();
+  if (compact) {
+    return `<div style="color:${color};font-weight:600;font-size:.88rem">$${fmt}</div>`
+         + `<div style="font-size:.6rem;color:${labelColor};text-transform:uppercase;letter-spacing:.05em;margin-top:1px;opacity:.85">${label}</div>`;
+  }
+  return `<div style="color:${color};font-weight:600">$${fmt}</div>`
+       + `<div style="font-size:.67rem;color:${labelColor};text-transform:uppercase;letter-spacing:.06em;margin-top:2px;opacity:.85">${label}</div>`;
 }
 
 // ─── REVENUE ────────────────────────────────────────────────────
@@ -3177,7 +3208,7 @@ function openQuoteModal(leadId) {
   const existingAmount = l.quoteAmount ? l.quoteAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
   openModalWith(
     `Quote Sent — ${sanitizeHTML(l.name)}`,
-    `<p style="color:var(--silver);font-size:.9rem;margin:0 0 18px">Enter the actual price you quoted this customer. This is saved separately from the original estimate so both are visible.</p>
+    `<p style="color:var(--silver);font-size:.9rem;margin:0 0 18px">Enter the price you quoted this customer. Both values are saved — the original estimate stays for reference.</p>
     <div class="form-group" style="margin-bottom:14px">
       <label class="form-label">Est. Job Value (original)</label>
       <div style="font-size:1rem;font-weight:700;color:var(--green);padding:8px 0">$${(l.value||0).toLocaleString()}</div>
@@ -3191,54 +3222,61 @@ function openQuoteModal(leadId) {
       <div id="quote-amount-error" style="display:none;color:#f87171;font-size:.8rem;margin-top:4px">Please enter a valid amount greater than $0.</div>
     </div>
     <div class="form-group">
-      <label class="form-label">Quote Notes (optional)</label>
+      <label class="form-label">Quote Notes <span style="color:#f87171">*</span></label>
       <textarea class="form-input" id="quote-notes-input" rows="3"
-        placeholder="e.g. Includes panel upgrade, 50A circuit, 40ft conduit run">${sanitizeHTML(l.quoteNotes||'')}</textarea>
+        placeholder="e.g. Includes panel upgrade, 50A circuit, 40ft conduit run"
+        oninput="document.getElementById('quote-notes-error').style.display='none'">${sanitizeHTML(l.quoteNotes||'')}</textarea>
+      <div id="quote-notes-error" style="display:none;color:#f87171;font-size:.8rem;margin-top:4px">Please describe what the quote includes (required for the audit trail).</div>
     </div>`,
-    `<button class="btn btn-outline" onclick="saveQuoteModal('${leadId}', true)">Skip — Just Mark Sent</button>
-     <button class="btn btn-primary" onclick="saveQuoteModal('${leadId}', false)">💾 Save Quote & Mark Sent</button>`
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveQuoteModal('${leadId}')">💾 Save Quote & Mark Sent</button>`
   );
   setTimeout(() => document.getElementById('quote-amount-input')?.focus(), 80);
 }
 
-function saveQuoteModal(leadId, skip) {
+function saveQuoteModal(leadId) {
   const l = leads.find(x => x.id === leadId);
   if (!l) { closeModalDirect(); return; }
 
-  if (!skip) {
-    const rawAmt = parseFloat(document.getElementById('quote-amount-input')?.value);
-    if (!rawAmt || rawAmt <= 0 || isNaN(rawAmt)) {
-      document.getElementById('quote-amount-error').style.display = 'block';
-      return; // keep modal open
-    }
-    const notes = document.getElementById('quote-notes-input')?.value?.trim() ?? '';
-
-    // Capture previous amount before overwriting (for activity log)
-    const _prevAmt = l.quoteAmount;
-    const _actType = _prevAmt != null ? 'quote_updated' : 'quote_sent';
-    const _prevVal = _prevAmt != null ? `$${Number(_prevAmt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '';
-    const _newVal  = `$${rawAmt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-
-    // Update in-memory lead immediately so UI reflects it without waiting for DB
-    l.quoteAmount    = rawAmt;
-    l.quoteNotes     = sanitizeHTML(notes);
-    l.quoteUpdatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    l.quoteUpdatedBy = currentUser?.name || currentUser?.id || '';
-
-    if (isSupabaseReady()) {
-      sbSaveQuote(leadId, rawAmt, l.quoteNotes, l.quoteUpdatedBy)
-        .then(r => {
-          if (!r) console.error('[DB] sbSaveQuote returned null for lead', leadId);
-          else console.log('[DB] Quote saved ✓', leadId, rawAmt);
-        })
-        .catch(e => console.error('[DB] sbSaveQuote error:', e.message));
-      const _a = _actorInfo();
-      sbLogActivity(leadId, _actType, _prevVal, _newVal, _a.type, _a.id, _a.name)
-        .catch(e => console.error('[DB] logActivity (saveQuoteModal):', e.message));
-    }
+  // ── Validate amount ──────────────────────────────────────────
+  const rawAmt = parseFloat(document.getElementById('quote-amount-input')?.value);
+  if (!rawAmt || rawAmt <= 0 || isNaN(rawAmt)) {
+    document.getElementById('quote-amount-error').style.display = 'block';
+    return; // keep modal open
   }
 
-  // Always transition status to quote-sent
+  // ── Validate notes ───────────────────────────────────────────
+  const notes = document.getElementById('quote-notes-input')?.value?.trim() ?? '';
+  if (notes.length < 5) {
+    document.getElementById('quote-notes-error').style.display = 'block';
+    return; // keep modal open
+  }
+
+  // ── Capture previous state for activity log ──────────────────
+  const _prevAmt = l.quoteAmount;
+  const _actType = _prevAmt != null ? 'quote_updated' : 'quote_sent';
+  const _prevVal = _prevAmt != null ? `$${Number(_prevAmt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '';
+  const _newVal  = `$${rawAmt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} — ${notes}`;
+
+  // ── Update in-memory lead immediately ────────────────────────
+  l.quoteAmount    = rawAmt;
+  l.quoteNotes     = sanitizeHTML(notes);
+  l.quoteUpdatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  l.quoteUpdatedBy = currentUser?.name || currentUser?.id || '';
+
+  if (isSupabaseReady()) {
+    sbSaveQuote(leadId, rawAmt, l.quoteNotes, l.quoteUpdatedBy)
+      .then(r => {
+        if (!r) console.error('[DB] sbSaveQuote returned null for lead', leadId);
+        else console.log('[DB] Quote saved ✓', leadId, rawAmt);
+      })
+      .catch(e => console.error('[DB] sbSaveQuote error:', e.message));
+    const _a = _actorInfo();
+    sbLogActivity(leadId, _actType, _prevVal, _newVal, _a.type, _a.id, _a.name)
+      .catch(e => console.error('[DB] logActivity (saveQuoteModal):', e.message));
+  }
+
+  // ── Transition status ────────────────────────────────────────
   closeModalDirect();
   upd(leadId, 'quote-sent');
 }

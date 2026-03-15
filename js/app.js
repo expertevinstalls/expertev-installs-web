@@ -731,7 +731,7 @@ function persist() {
 }
 
 (function _loadPersisted() {
-  console.log('[VERSION] build=forensic-fix-2026-03-14-v3');
+  console.log('[VERSION] build=2026-03-15-v2');
 
   // ── Flush stale localStorage from before demo-leads were removed ───────────
   // Leads with IDs L001–L009 are former seed rows. If any are in localStorage,
@@ -1312,7 +1312,7 @@ async function doChangePassword() {
 // APP INIT
 // ═══════════════════════════════════════════════════════════════
 function initApp() {
-  console.log('[BUILD] initApp — version=forensic-fix-2026-03-14-v1 | role:', currentUser?.role, '| email:', currentUser?.email, '| Supabase ready:', isSupabaseReady());
+  console.log('[BUILD] initApp — version=2026-03-15-v2 | role:', currentUser?.role, '| email:', currentUser?.email, '| Supabase ready:', isSupabaseReady());
   const av = document.getElementById('user-avatar');
   const nameInitial = (currentUser.name || currentUser.email || '?')[0].toUpperCase();
   av.textContent = nameInitial;
@@ -2439,6 +2439,7 @@ function saveSettings() {
 
 // ─── CONTRACTOR PAGES ────────────────────────────────────────────
 function pgMyLeads() {
+  console.log('[RENDER] pgMyLeads — currentContractor:', currentContractor ? JSON.stringify({ id: currentContractor.id, companyName: currentContractor.companyName, name: currentContractor.name }) : 'null', '| currentUser.name:', JSON.stringify(currentUser?.name));
   return `<div class="page" id="page-my-leads">
     <div class="page-header">
       <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${sanitizeHTML(currentContractor?.companyName || currentContractor?.name || 'Partner Account')}</p></div>
@@ -2587,6 +2588,7 @@ function pgMyPipeline() {
 }
 
 function pgMyRevenue() {
+  console.log('[RENDER] pgMyRevenue — currentContractor:', currentContractor ? JSON.stringify({ id: currentContractor.id, companyName: currentContractor.companyName, name: currentContractor.name }) : 'null', '| currentUser.name:', JSON.stringify(currentUser?.name));
   const myLeads    = leads.filter(l=>l.contractor===currentUser.id);
   const done       = myLeads.filter(l=>l.status==='completed');
   const contacted  = myLeads.filter(l=>l.contactedAt);
@@ -2667,6 +2669,7 @@ function openLeadDetail(id) {
         || (l.contractor === currentUser?.id ? currentContractor : null))
     : null;
   const cName = _cRec ? (_cRec.companyName || _cRec.name || 'Unassigned') : 'Unassigned';
+  console.log('[DETAIL] openLeadDetail', id, '— l.contractor:', l.contractor, '| dbContractors.length:', _getContractors().length, '| _cRec:', _cRec ? JSON.stringify({ id: _cRec.id, companyName: _cRec.companyName, name: _cRec.name }) : 'null', '| cName:', cName);
   document.getElementById('modal').classList.toggle('modal-lg', true);
   document.getElementById('modal-title').textContent = `${l.id} — ${l.name}`;
   const _ji = getJobIntelligence(l);

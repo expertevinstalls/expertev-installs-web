@@ -1,0 +1,30 @@
+# ============================================================
+#  supabase/config.toml — Supabase project configuration
+#
+#  This file is read by the Supabase CLI during deployments.
+#
+#  To deploy functions with this config:
+#    supabase functions deploy send-monthly-report
+#
+#  Or deploy directly with the flag:
+#    supabase functions deploy send-monthly-report --no-verify-jwt
+# ============================================================
+
+[project_id]
+# Replace with your Supabase project ref (from Settings → General)
+# e.g. "pvjyhgjagszgvkwyfieu"
+
+# ── Edge Function settings ────────────────────────────────────
+
+[functions.send-monthly-report]
+# Disable JWT verification for this function.
+#
+# Reason: This function must be callable from two paths:
+#   1. The admin Settings page (manual send button)
+#   2. pg_cron auto-scheduler (no user session available)
+#
+# Security is enforced at the payload level:
+#   - requires `resendApiKey` field (admin's Resend API key)
+#   - requires `recipient` field
+#   - only sends email — no data is exposed or exfiltrated
+verify_jwt = false

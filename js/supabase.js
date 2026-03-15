@@ -1020,20 +1020,16 @@ async function sbInviteContractor(contractorId, email, extraFields = {}) {
  * @returns {{ ok: boolean, error?: string }}
  */
 async function sbSendMonthlyReport(reportPayload) {
-  const db = _db();
-  if (!db) return { error: 'Supabase not ready' };
-
+  // send-monthly-report is deployed with verify_jwt = false (see supabase/config.toml).
+  // It must be callable from both the admin UI and pg_cron (which has no user session).
+  // Security is enforced inside the function via required resendApiKey + recipient fields.
   try {
-    const { data: { session } } = await db.auth.getSession();
-    if (!session?.access_token) return { error: 'Session expired — please sign out and sign in again.' };
-
     const fnUrl = `${_SB_URL}/functions/v1/send-monthly-report`;
     const res   = await fetch(fnUrl, {
       method:  'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey':        _SB_KEY,
+        'Content-Type': 'application/json',
+        'apikey':       _SB_KEY,
       },
       body: JSON.stringify(reportPayload),
     });

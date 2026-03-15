@@ -733,34 +733,18 @@ function persist() {
 (function _loadPersisted() {
   console.log('[VERSION] build=2026-03-15-v2');
 
-  // ── Flush stale localStorage from before demo-leads were removed ───────────
-  // Leads with IDs L001–L009 are former seed rows. If any are in localStorage,
-  // discard the entire cached leads array so the admin never sees them again.
-  // This runs once; after DB hydration, localStorage will hold only real leads.
-  const _DEMO_IDS = new Set(['L001','L002','L003','L004','L005','L006','L007','L008','L009']);
-  try {
-    const sl = localStorage.getItem(_STORE.leads);
-    if (sl) {
-      const p = JSON.parse(sl);
-      if (Array.isArray(p) && p.some(l => _DEMO_IDS.has(l.id))) {
-        console.warn('[VERSION] Clearing stale localStorage: demo leads detected — will re-hydrate from Supabase');
-        localStorage.removeItem(_STORE.leads);
-        localStorage.removeItem(_STORE.notifs); // flush demo notifications too
-      }
-    }
-  } catch(e) { /* ignore */ }
+  // Clear any stale leads/notifs still in localStorage from before this change.
+  // Previously logout did not clear these keys; now it does, but run once to clean
+  // up any existing cached data on browsers that haven't logged out yet.
+  localStorage.removeItem(_STORE.leads);
+  localStorage.removeItem(_STORE.notifs);
 
   try {
-    const sl = localStorage.getItem(_STORE.leads);
-    if (sl) {
-      const p = JSON.parse(sl);
-      if (Array.isArray(p) && p.length > 0) leads.splice(0, leads.length, ...p);
-    }
-    const sn = localStorage.getItem(_STORE.notifs);
-    if (sn) {
-      const p = JSON.parse(sn);
-      if (Array.isArray(p)) notifications.splice(0, notifications.length, ...p);
-    }
+    // NOTE: leads and notifications are intentionally NOT restored from localStorage here.
+    // Supabase is the sole source of truth. Restoring cached leads/notifs pre-auth would
+    // allow a prior user's data to appear on another user's login (cross-session bleed).
+    // initApp() hydrates leads from Supabase after login; notifications start fresh each session.
+    console.log('[VERSION] localStorage leads/notifs skipped at startup — will hydrate from Supabase after login');
     const ss = localStorage.getItem(_STORE.settings);
     if (ss) {
       const keyBefore = settings.googleMapsKey; // preserve non-empty default
@@ -911,10 +895,16 @@ async function doLogout() {
   currentUser = null;
   currentContractor = null;
   dbContractors = [];
-  // Clear in-memory lead and notification data so prior user's data never leaks
-  // to the next login session within the same browser tab.
+  // Clear in-memory lead and notification data.
   leads.splice(0, leads.length);
   notifications.splice(0, notifications.length);
+  // CRITICAL: also clear localStorage so the next login session — which may be a
+  // different user on the same device — never sees stale data from this session.
+  // Without this, _loadPersisted() restores the outgoing user's leads on next page load,
+  // and _pollNewLeads() can detect them as "new" and inject them into the next session.
+  localStorage.removeItem(_STORE.leads);
+  localStorage.removeItem(_STORE.notifs);
+  console.log('[LOGOUT] localStorage leads + notifs cleared');
   if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
   _lastNewLeadCount = -1;
   // Clear portal intent so a fresh page visit shows the public site.
@@ -1339,10 +1329,18 @@ function initApp() {
   buildPages();
   buildSidebar();
   navTo(currentUser.role === 'admin' ? 'dashboard' : 'my-leads');
-  // Seed poll baseline and start lead-polling interval
+  // Start lead-polling interval for admin only.
+  // Poll reads localStorage to detect webform submissions from other tabs/windows.
+  // Contractors receive updates exclusively via Supabase Realtime subscription —
+  // polling localStorage is irrelevant for them and could inject stale cross-session data.
   _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
   if (_pollInterval) clearInterval(_pollInterval);
-  _pollInterval = setInterval(_pollNewLeads, 10000);
+  if (currentUser.role === 'admin') {
+    _pollInterval = setInterval(_pollNewLeads, 10000);
+    console.log('[POLL] Lead poll started for admin');
+  } else {
+    console.log('[POLL] Lead poll skipped for contractor — using Realtime only');
+  }
   // Hydrate from Supabase — DB is the sole source of truth when connected.
   // Do NOT preserve local-only leads: demo seeds (L001–L009) and stale localStorage
   // entries are not in the DB and must not be merged back in.
@@ -1361,7 +1359,14 @@ function initApp() {
       buildPages();
       buildSidebar();
       _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
-      console.log('[DB] Hydrated', rows.length, 'leads from Supabase');
+      if (currentUser?.role === 'contractor') {
+        const myCount = rows.filter(l => l.contractor === currentUser.id).length;
+        console.log('[DB] Contractor leads hydrated from Supabase — total in DB:', rows.length,
+          '| assigned to me (id=' + currentUser.id + '):', myCount,
+          '| source: Supabase only, no localStorage fallback');
+      } else {
+        console.log('[DB] Hydrated', rows.length, 'leads from Supabase');
+      }
       // Re-activate the page that was visible before rebuild — triggers renderAssignTable(),
       // renderLeadsTable() etc. as appropriate. refreshAdminDashboard() is called via navTo('dashboard').
       navTo(activePageId);

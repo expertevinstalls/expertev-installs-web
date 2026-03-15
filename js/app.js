@@ -817,7 +817,25 @@ function persist() {
 }
 
 (function _loadPersisted() {
-  console.log('[VERSION] build=forensic-fix-2026-03-14-v1');
+  console.log('[VERSION] build=forensic-fix-2026-03-14-v3');
+
+  // ── Flush stale localStorage from before demo-leads were removed ───────────
+  // Leads with IDs L001–L009 are former seed rows. If any are in localStorage,
+  // discard the entire cached leads array so the admin never sees them again.
+  // This runs once; after DB hydration, localStorage will hold only real leads.
+  const _DEMO_IDS = new Set(['L001','L002','L003','L004','L005','L006','L007','L008','L009']);
+  try {
+    const sl = localStorage.getItem(_STORE.leads);
+    if (sl) {
+      const p = JSON.parse(sl);
+      if (Array.isArray(p) && p.some(l => _DEMO_IDS.has(l.id))) {
+        console.warn('[VERSION] Clearing stale localStorage: demo leads detected — will re-hydrate from Supabase');
+        localStorage.removeItem(_STORE.leads);
+        localStorage.removeItem(_STORE.notifs); // flush demo notifications too
+      }
+    }
+  } catch(e) { /* ignore */ }
+
   try {
     const sl = localStorage.getItem(_STORE.leads);
     if (sl) {
@@ -1042,6 +1060,10 @@ async function _resolveAuthUser(authUser) {
       name: record.companyName || record.name,
       id:   record.id,
     };
+    console.log('[AUTH] Contractor resolved — id:', record.id,
+      '| companyName:', JSON.stringify(record.companyName),
+      '| name:', JSON.stringify(record.name),
+      '| currentUser.name:', JSON.stringify(currentUser.name));
 
     // Update last_login_at (non-blocking but logged so we can confirm it fires)
     if (isSupabaseReady()) {
@@ -1108,10 +1130,8 @@ function _setupRealtimeSubscriptions() {
       if (!currentUser) return;
       sbFetchLeadsWithNotes().then(rows => {
         if (!currentUser || !Array.isArray(rows)) return;
-        // Preserve local-only leads not yet in DB (same merge strategy as initApp hydration)
-        const dbIds = new Set(rows.map(r => r.id));
-        const localOnly = leads.filter(l => !dbIds.has(l.id));
-        leads.splice(0, leads.length, ...rows, ...localOnly);
+        // DB is sole source of truth — replace leads entirely (no local-only merging).
+        leads.splice(0, leads.length, ...rows);
         persist();
         buildSidebar();
         const pg = document.querySelector('#pages .page.active')?.id;
@@ -1121,7 +1141,7 @@ function _setupRealtimeSubscriptions() {
         else if (pg === 'page-assign')      renderAssignTable();
         else if (pg === 'page-my-leads')    renderMyLeads();
         else if (pg === 'page-my-pipeline') buildPages();
-        console.log('[Realtime] leads refreshed —', rows.length, 'rows from DB' + (localOnly.length ? ' + ' + localOnly.length + ' local-only preserved' : ''));
+        console.log('[Realtime] leads refreshed —', rows.length, 'rows from DB');
       }).catch(e => console.warn('[Realtime] leads refresh error:', e.message));
     }, 600);
   };
@@ -1385,6 +1405,22 @@ function initApp() {
   av.className = 'user-avatar ' + currentUser.role;
   document.getElementById('user-name-display').textContent = currentUser.name;
   document.getElementById('user-role-display').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Contractor Partner';
+
+  // BUG-FIX: When Supabase is live, discard any locally-cached or demo/seed leads before
+  // the first render. The hydration below will populate from DB only. This prevents
+  // demo leads (L001–L009) from showing on the admin dashboard even briefly.
+  if (isSupabaseReady()) {
+    leads.splice(0, leads.length);
+  }
+
+  // BUG-FIX: Contractors get a clean notification slate on every login.
+  // Admin-level and demo notifications are irrelevant to their pipeline.
+  // Their session notifications will build up organically as events occur.
+  if (currentUser.role === 'contractor') {
+    notifications.splice(0, notifications.length);
+    persist();
+  }
+
   renderNotifDot();
   buildPages();
   buildSidebar();
@@ -1393,9 +1429,9 @@ function initApp() {
   _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
   if (_pollInterval) clearInterval(_pollInterval);
   _pollInterval = setInterval(_pollNewLeads, 10000);
-  // Hydrate from Supabase in the background.
-  // Strategy: DB is the source of truth. Any locally-staged leads (id not in DB)
-  // are preserved so nothing is lost if a previous insert failed transiently.
+  // Hydrate from Supabase — DB is the sole source of truth when connected.
+  // Do NOT preserve local-only leads: demo seeds (L001–L009) and stale localStorage
+  // entries are not in the DB and must not be merged back in.
   if (isSupabaseReady()) {
     sbFetchLeadsWithNotes().then(rows => {
       if (!currentUser) return; // user may have logged out while fetch was in flight
@@ -1403,22 +1439,15 @@ function initApp() {
         console.warn('[DB] hydrate: sbFetchLeadsWithNotes returned non-array — keeping local data');
         return;
       }
-      // Build a set of IDs that exist in DB
-      const dbIds = new Set(rows.map(r => r.id));
-      // Preserve any local-only leads not yet confirmed in DB (e.g., failed insert)
-      const localOnly = leads.filter(l => !dbIds.has(l.id));
-      if (localOnly.length > 0) {
-        console.warn('[DB] hydrate: found', localOnly.length, 'local-only lead(s) not in Supabase:', localOnly.map(l => l.id));
-      }
-      // Merge: DB rows first (authoritative), then any local-only leftovers
       // Capture active page BEFORE buildPages() wipes all active classes.
       const activePageId = document.querySelector('#pages .page.active')?.id?.replace('page-', '') || 'dashboard';
-      leads.splice(0, leads.length, ...rows, ...localOnly);
+      // DB is sole source of truth — replace leads entirely. No local-only merging.
+      leads.splice(0, leads.length, ...rows);
       persist();
       buildPages();
       buildSidebar();
       _lastNewLeadCount = leads.filter(l => l.status === 'new').length;
-      console.log('[DB] Hydrated', rows.length, 'leads from Supabase' + (localOnly.length ? ' + ' + localOnly.length + ' local-only preserved' : ''));
+      console.log('[DB] Hydrated', rows.length, 'leads from Supabase');
       // Re-activate the page that was visible before rebuild — triggers renderAssignTable(),
       // renderLeadsTable() etc. as appropriate. refreshAdminDashboard() is called via navTo('dashboard').
       navTo(activePageId);
@@ -1595,11 +1624,10 @@ function pgAdminDashboard() {
       <div class="card">
         <div class="card-header"><span>🕐</span><div class="card-title">Recent Activity</div></div>
         <div class="card-body">
-          <div class="activity-item"><div class="activity-dot" style="background:var(--blue)"></div><div><div class="activity-text"><strong>Marcus Thompson</strong> submitted — Level 2 Home Charger, Philadelphia</div><div class="activity-time">2 min ago</div></div></div>
-          <div class="activity-item"><div class="activity-dot" style="background:var(--yellow)"></div><div><div class="activity-text">Lead <strong>L006 — Allison Cho</strong> scheduled for April 2nd</div><div class="activity-time">18 min ago</div></div></div>
-          <div class="activity-item"><div class="activity-dot" style="background:var(--green)"></div><div><div class="activity-text"><strong>David Kim</strong> job completed by Red Flow Electric — $2,100</div><div class="activity-time">1 hr ago</div></div></div>
-          <div class="activity-item"><div class="activity-dot" style="background:var(--blue)"></div><div><div class="activity-text"><strong>Rosa Martinez</strong> commercial fleet install — Burlington, NJ</div><div class="activity-time">3 hrs ago</div></div></div>
-          <div class="activity-item"><div class="activity-dot" style="background:var(--cyan)"></div><div><div class="activity-text">Red Flow Electric accepted assignment for <strong>Jennifer Walsh</strong></div><div class="activity-time">Yesterday</div></div></div>
+          ${notifications.length === 0
+            ? `<div style="color:var(--gray);font-size:.83rem;padding:12px 0;text-align:center">No recent activity. New lead events will appear here.</div>`
+            : notifications.slice(0, 5).map(n => `<div class="activity-item"><div class="activity-dot" style="background:var(--blue)"></div><div><div class="activity-text">${n.text}</div><div class="activity-time">${n.time}</div></div></div>`).join('')
+          }
         </div>
       </div>
       <div class="card">
@@ -2499,7 +2527,7 @@ function saveSettings() {
 function pgMyLeads() {
   return `<div class="page" id="page-my-leads">
     <div class="page-header">
-      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${currentUser?.name || ''}</p></div>
+      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${currentContractor?.companyName || currentContractor?.name || currentUser?.name || ''}</p></div>
       <div class="page-header-actions">
         <button class="btn btn-outline btn-sm" onclick="toggleMyLeadsView()">⊞ Toggle View</button>
       </div>
@@ -2655,7 +2683,7 @@ function pgMyRevenue() {
   const reviewd    = done.filter(l=>l.review);
   const avgRating  = reviewd.length ? (reviewd.reduce((s,l)=>s+l.review.rating,0)/reviewd.length).toFixed(1) : '—';
   return `<div class="page" id="page-my-revenue">
-    <div class="page-header"><div><h1>Performance Analytics</h1><p>${sanitizeHTML((currentContractor && (currentContractor.companyName || currentContractor.name)) || currentUser.name || 'Your')} — your stats</p></div></div>
+    <div class="page-header"><div><h1>Performance Analytics</h1><p>${sanitizeHTML(currentContractor?.companyName || currentContractor?.name || currentUser?.name || 'Your')} — your stats</p></div></div>
     <div class="stats-grid">
       <div class="stat-card blue"><div class="stat-icon">⚡</div><div class="stat-value blue">${myLeads.length}</div><div class="stat-label">Leads Received</div></div>
       <div class="stat-card yellow"><div class="stat-icon">📞</div><div class="stat-value yellow">${contacted.length}</div><div class="stat-label">Leads Contacted</div></div>

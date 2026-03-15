@@ -2441,7 +2441,7 @@ function saveSettings() {
 function pgMyLeads() {
   return `<div class="page" id="page-my-leads">
     <div class="page-header">
-      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${currentContractor?.companyName || currentContractor?.name || currentUser?.name || ''}</p></div>
+      <div><h1>My Leads</h1><p>Pre-qualified electrical projects — ${sanitizeHTML(currentContractor?.companyName || currentContractor?.name || 'Partner Account')}</p></div>
       <div class="page-header-actions">
         <button class="btn btn-outline btn-sm" onclick="toggleMyLeadsView()">⊞ Toggle View</button>
       </div>
@@ -2596,7 +2596,7 @@ function pgMyRevenue() {
   const reviewd    = done.filter(l=>l.review);
   const avgRating  = reviewd.length ? (reviewd.reduce((s,l)=>s+l.review.rating,0)/reviewd.length).toFixed(1) : '—';
   return `<div class="page" id="page-my-revenue">
-    <div class="page-header"><div><h1>Performance Analytics</h1><p>${sanitizeHTML(currentContractor?.companyName || currentContractor?.name || currentUser?.name || 'Your')} — your stats</p></div></div>
+    <div class="page-header"><div><h1>Performance Analytics</h1><p>${sanitizeHTML(currentContractor?.companyName || currentContractor?.name || 'Partner Account')} — your stats</p></div></div>
     <div class="stats-grid">
       <div class="stat-card blue"><div class="stat-icon">⚡</div><div class="stat-value blue">${myLeads.length}</div><div class="stat-label">Leads Received</div></div>
       <div class="stat-card yellow"><div class="stat-icon">📞</div><div class="stat-value yellow">${contacted.length}</div><div class="stat-label">Leads Contacted</div></div>
@@ -2623,7 +2623,7 @@ function pgMyRevenue() {
 }
 
 function pgMyProfile() {
-  const c = currentContractor || _getContractors().find(x => x.id === currentUser?.id) || _getContractors()[0] || {};
+  const c = currentContractor || {};
   const counties = Array.isArray(c.counties) ? c.counties : [];
   return `<div class="page" id="page-my-profile">
     <div class="page-header"><div><h1>My Profile</h1><p>${sanitizeHTML(c.companyName || c.name || 'Contractor')} — Partner Account</p></div></div>
@@ -2659,7 +2659,14 @@ function pgMyProfile() {
 function openLeadDetail(id) {
   const l = leads.find(x => x.id === id);
   if (!l) return;
-  const cName = l.contractor ? (_getContractors().find(c=>c.id===l.contractor)||{}).name || 'Unassigned' : 'Unassigned';
+  // Look up assigned contractor: prefer dbContractors (loaded for admin), fall back to
+  // currentContractor when a contractor is viewing their own lead (dbContractors is empty
+  // for contractor logins since _loadDbContractors() is only called in the admin path).
+  const _cRec = l.contractor
+    ? (_getContractors().find(c => c.id === l.contractor)
+        || (l.contractor === currentUser?.id ? currentContractor : null))
+    : null;
+  const cName = _cRec ? (_cRec.companyName || _cRec.name || 'Unassigned') : 'Unassigned';
   document.getElementById('modal').classList.toggle('modal-lg', true);
   document.getElementById('modal-title').textContent = `${l.id} — ${l.name}`;
   const _ji = getJobIntelligence(l);

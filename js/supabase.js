@@ -237,11 +237,24 @@ async function sbUpdateLead(id, fields) {
 /**
  * Update a lead's status.
  * Automatically sets contacted_at when transitioning to 'contacted'.
+ * extraFields: optional additional DB columns to write atomically (e.g. won_at, final_value).
  */
-async function sbUpdateLeadStatus(id, status) {
-  const update = { status };
+async function sbUpdateLeadStatus(id, status, extraFields) {
+  const update = { status, ...extraFields };
   if (status === 'contacted') update.contacted_at = new Date().toISOString();
   return sbUpdateLead(id, update);
+}
+
+/**
+ * Lock in the final revenue fields when a lead is won.
+ * Stores final_value (the canonical revenue amount) and won_at (timestamp).
+ * Call this atomically with the status change so the two values are never out of sync.
+ */
+async function sbSetWonData(id, finalValue, wonAt) {
+  return sbUpdateLead(id, {
+    final_value: finalValue,
+    won_at:      wonAt,
+  });
 }
 
 /**
@@ -604,6 +617,8 @@ function _leadToRow(lead) {
     quote_updated_at: lead.quoteUpdatedAt   ? _parseDisplayDate(lead.quoteUpdatedAt) : null,
     quote_updated_by: lead.quoteUpdatedBy   ?? '',
     call_notes:       lead.callNotes        ?? '',
+    final_value:      lead.finalValue       ?? null,
+    won_at:           lead.wonAt            ?? null,
     created_display:  lead.created          ?? '',
     // created_at intentionally omitted — DB sets it via DEFAULT NOW()
   };
@@ -659,6 +674,9 @@ function _rowToLead(row, notes) {
       : null,
     quoteUpdatedBy:  row.quote_updated_by ?? '',
     callNotes:       row.call_notes       ?? '',
+    finalValue:      row.final_value      ?? null,  // locked-in revenue (set when won)
+    wonAt:           row.won_at           ?? null,  // ISO timestamp of win (for monthly revenue)
+    createdAt:       row.created_at       ?? null,  // ISO timestamp (for date filtering)
     created:         row.created_display  ||
       new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     notes: noteRows.map(n => ({
@@ -829,25 +847,24 @@ async function sbFetchCurrentContractor(authUserId) {
 }
 
 /**
- * Fetch all active contractors.
+ * Fetch ALL contractors (active + inactive) ordered by company name.
+ * Returns ALL so that inactive contractors still appear in historical reports.
+ * Filtering for assignment dropdowns (active only) or reporting (real only)
+ * happens at the call site in app.js.
  * Returns array of app-format contractor objects or null.
  */
 async function sbFetchActiveContractors() {
   const db = _db();
   if (!db) return null;
-  // Use neq(false) instead of eq(true) so contractors where is_active IS NULL
-  // (created before schema_v2.sql/schema_contractor_patch.sql ran the backfill)
-  // are still returned. NULL is treated as "not explicitly inactive".
   const { data, error } = await db
     .from('contractors')
     .select('*')
-    .neq('is_active', false)
     .order('company_name');
   if (error) {
-    // Fallback: if is_active column doesn't exist yet, query by status instead
-    if (error.message.includes('column') || error.code === '42703') {
-      console.warn('[Supabase] fetchActiveContractors: is_active column missing — falling back to status=active query');
-      const { data: d2, error: e2 } = await db.from('contractors').select('*').eq('status', 'active').order('name');
+    // Fallback: try ordering by name if company_name column not found
+    if (error.message.includes('company_name') || error.code === '42703') {
+      console.warn('[Supabase] fetchActiveContractors: company_name sort failed — falling back to name order');
+      const { data: d2, error: e2 } = await db.from('contractors').select('*').order('name');
       if (e2) { console.error('[Supabase] fetchActiveContractors (fallback):', e2.message); return null; }
       return (d2 || []).map(_rowToContractor);
     }
@@ -995,6 +1012,48 @@ async function sbInviteContractor(contractorId, email, extraFields = {}) {
 }
 
 
+/* ── 11b. MONTHLY REPORT EMAIL ───────────────────────────── */
+
+/**
+ * Calls the `send-monthly-report` Supabase Edge Function.
+ * @param {object} reportPayload  — built by sendMonthlyReport() in app.js
+ * @returns {{ ok: boolean, error?: string }}
+ */
+async function sbSendMonthlyReport(reportPayload) {
+  const db = _db();
+  if (!db) return { error: 'Supabase not ready' };
+
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session?.access_token) return { error: 'Session expired — please sign out and sign in again.' };
+
+    const fnUrl = `${_SB_URL}/functions/v1/send-monthly-report`;
+    const res   = await fetch(fnUrl, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey':        _SB_KEY,
+      },
+      body: JSON.stringify(reportPayload),
+    });
+
+    let body = {};
+    try { body = await res.json(); } catch { /* ignore */ }
+
+    if (!res.ok) {
+      const msg = body?.error || body?.message || `HTTP ${res.status}`;
+      console.error('[Supabase] sbSendMonthlyReport error:', msg, body);
+      return { error: msg };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('[Supabase] sbSendMonthlyReport fetch error:', err.message);
+    return { error: err.message };
+  }
+}
+
+
 /* ── 12. CONTRACTOR MAPPERS ───────────────────────────────── */
 
 /**
@@ -1036,11 +1095,12 @@ function _contractorToRow(c) {
     revenue:      c.revenue      ?? 0,
     rating:       c.rating       ?? 5.0,
     status:       c.status       ?? 'active',
-    is_active:    c.isActive     ?? (c.status !== 'inactive'),
-    auth_user_id: c.authUserId   ?? undefined,
-    invited_at:   c.invitedAt    ?? undefined,
-    last_login_at:c.lastLoginAt  ?? undefined,
-    notes:        c.notes        ?? '',
+    is_active:       c.isActive        ?? (c.status !== 'inactive'),
+    auth_user_id:    c.authUserId      ?? undefined,
+    invited_at:      c.invitedAt       ?? undefined,
+    last_login_at:   c.lastLoginAt     ?? undefined,
+    notes:           c.notes           ?? '',
+    contractor_type: c.contractorType  ?? 'real',
   };
 }
 
@@ -1063,10 +1123,11 @@ function _rowToContractor(row) {
     rating:      row.rating      ?? 5.0,
     status:      row.is_active   ? 'active' : (row.status ?? 'inactive'),
     isActive:    row.is_active   ?? (row.status === 'active'),
-    authUserId:  row.auth_user_id ?? null,
-    invitedAt:   row.invited_at  ?? null,
-    lastLoginAt: row.last_login_at ?? null,
-    notes:       row.notes       ?? '',
+    authUserId:      row.auth_user_id    ?? null,
+    invitedAt:       row.invited_at      ?? null,
+    lastLoginAt:     row.last_login_at   ?? null,
+    notes:           row.notes           ?? '',
+    contractorType:  row.contractor_type ?? 'real',  // 'real' | 'demo'
   };
 }
 

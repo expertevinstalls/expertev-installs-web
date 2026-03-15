@@ -15,3 +15,6 @@ let currentContractor = null; // logged-in contractor's DB record (null for admi
 let _awaitingPasswordSetup = false; // true when an invite/recovery link is being processed
 let _authListenerRegistered = false; // prevents registering the auth listener more than once
 let _realtimeSubs = [];             // active Supabase Realtime unsubscribe functions
+let _dashPeriod          = 'this-month';  // current period for admin dashboard: 'this-month' | 'last-month' | '90-days' | 'all'
+let _revPeriod           = 'this-month';  // current period for revenue page: same options
+let _inactiveLoginAttempt = false;        // set by _resolveAuthUser when is_active = false

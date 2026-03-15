@@ -455,7 +455,11 @@ function _getContractors() {
 /* ── Auto Territory Assignment (round-robin) ── */
 function autoAssignByCounty(county, state) {
   if (!settings.autoAssign) return null;
-  const eligible = _getContractors().filter(c => c.counties.includes(county) && c.status === 'active');
+  const eligible = _getContractors().filter(c =>
+    c.counties.includes(county) &&
+    c.isActive !== false &&
+    (c.contractorType || 'real') !== 'demo'
+  );
   if (!eligible.length) return null;
   const key = county;
   _rrIndex[key] = (_rrIndex[key] || 0) % eligible.length;
@@ -828,9 +832,13 @@ async function doLogin() {
 
     if (!error) {
       // Supabase sign-in succeeded
+      _inactiveLoginAttempt = false;
       await _resolveAuthUser(user);
       if (!currentUser) {
-        errEl.textContent = 'Account not recognized. Contact your administrator.';
+        errEl.textContent = _inactiveLoginAttempt
+          ? 'Your account has been deactivated. Contact your administrator.'
+          : 'Account not recognized. Contact your administrator.';
+        _inactiveLoginAttempt = false;
         errEl.style.display = 'block';
         return;
       }
@@ -956,6 +964,15 @@ async function _resolveAuthUser(authUser) {
     }
 
     if (!record) { currentUser = null; return; } // unknown account
+
+    // ── Block inactive contractors ──────────────────────────────
+    if (record.isActive === false) {
+      currentUser = null;
+      // Set a specific flag so doLogin() can show a better error message
+      _inactiveLoginAttempt = true;
+      console.warn('[AUTH] Contractor login blocked — account is inactive:', record.id, record.companyName || record.name);
+      return;
+    }
 
     currentContractor = record;
     currentUser = {
@@ -1510,35 +1527,126 @@ function buildPages() {
 
 // ─── ADMIN DASHBOARD ────────────────────────────────────────────
 function pgAdminDashboard() {
-  const newC      = leads.filter(l => l.status === 'new').length;
-  const pipeline  = leads.filter(l => !['completed','lost'].includes(l.status)).length;
-  const completed = leads.filter(l => l.status === 'completed').length;
-  const revenue   = leads.filter(l => l.status === 'completed').reduce((s,l) => s+_revAmount(l), 0);
-  const counties  = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
-  const maxC      = Math.max(...counties.map(c => leads.filter(l => l.county===c).length), 1);
-  const recent    = leads.slice().reverse().slice(0,6);
+  // ── Period filter setup ──────────────────────────────────────
+  const range      = _dateRange(_dashPeriod);
+  const isAll      = _dashPeriod === 'all';
+  const inCreated  = l => isAll || _inRange(l.createdAt, range);
+  const inWon      = l => isAll || _inRange(l.wonAt,     range);
+  const demoIds    = _demoContractorIds();
+
+  // ── Lead counts — use created_at ─────────────────────────────
+  const periodLeads    = leads.filter(inCreated);
+  const newC           = periodLeads.filter(l => l.status === 'new').length;
+  const assignedCount  = periodLeads.filter(l => l.status === 'assigned').length;
+  const lostCount      = periodLeads.filter(l => l.status === 'lost').length;
+  const activePipeline = leads.filter(l => !['completed','lost'].includes(l.status)).length; // current state, not time-filtered
+
+  // ── Revenue — use won_at, exclude demo ───────────────────────
+  const wonLeads  = leads.filter(l => l.status === 'completed' && inWon(l) && (!l.contractor || !demoIds.has(l.contractor)));
+  const revenue   = wonLeads.reduce((s,l) => s + _revenueValue(l), 0);
+  const fee       = Math.round(revenue * settings.commissionPct / 100);
+  const avgWon    = wonLeads.length ? Math.round(revenue / wonLeads.length) : 0;
+
+  // ── Contractor stats ─────────────────────────────────────────
+  const realActive = _realContractors().filter(c => c.isActive !== false).length;
+
+  // ── Per-contractor performance for period ────────────────────
+  const realCtrs = _realContractors();
+  const cPerf = realCtrs.map(c => {
+    const cWon = wonLeads.filter(l => l.contractor === c.id);
+    const cRev = cWon.reduce((s,l) => s + _revenueValue(l), 0);
+    return { c, jobs: cWon.length, rev: cRev };
+  }).filter(x => x.jobs > 0).sort((a,b) => b.rev - a.rev);
+
+  // ── Recent Leads — always show last 6 regardless of filter ───
+  const recent = leads.slice().reverse().slice(0,6);
+
+  // ── County chart — use period-filtered leads ─────────────────
+  const counties = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
+  const maxC     = Math.max(...counties.map(c => periodLeads.filter(l=>l.county===c).length), 1);
+
+  // ── Period picker HTML ───────────────────────────────────────
+  const picker = `<select class="form-input" style="width:auto;padding:6px 10px;font-size:.82rem;background:var(--navy-mid);color:var(--white);border:1px solid var(--navy-border);cursor:pointer" onchange="setDashPeriod(this.value)">
+    <option value="this-month" ${_dashPeriod==='this-month'?'selected':''}>This Month</option>
+    <option value="last-month" ${_dashPeriod==='last-month'?'selected':''}>Last Month</option>
+    <option value="90-days"    ${_dashPeriod==='90-days'   ?'selected':''}>Last 90 Days</option>
+    <option value="all"        ${_dashPeriod==='all'       ?'selected':''}>All Time</option>
+  </select>`;
+
   return `<div class="page" id="page-dashboard">
     <div class="page-header">
-      <div><h1>Dashboard Overview</h1><p>ExpertEV Installers · PA/NJ Territory</p></div>
-      <div class="page-header-actions">
+      <div>
+        <h1>Dashboard Overview</h1>
+        <p>ExpertEV Installers · PA/NJ Territory · <span style="color:var(--cyan)">${_periodLabel(_dashPeriod)}</span></p>
+      </div>
+      <div class="page-header-actions" style="gap:8px">
+        ${picker}
         <button class="btn btn-primary" onclick="openAddLead()">+ New Lead</button>
       </div>
     </div>
+
     <div class="stats-grid">
-      <div class="stat-card blue"><div class="stat-icon">⚡</div><div class="stat-value blue">${newC}</div><div class="stat-label">New Leads</div><div class="stat-change up">↑ 3 this week</div></div>
-      <div class="stat-card yellow"><div class="stat-icon">🔄</div><div class="stat-value yellow">${pipeline}</div><div class="stat-label">Active Pipeline</div><div class="stat-change up">↑ 2 today</div></div>
-      <div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-value green">${completed}</div><div class="stat-label">Completed Jobs</div><div class="stat-change up">↑ 1 this week</div></div>
-      <div class="stat-card cyan"><div class="stat-icon">💰</div><div class="stat-value cyan">$${revenue.toLocaleString()}</div><div class="stat-label">Revenue Generated</div></div>
-      <div class="stat-card blue"><div class="stat-icon">🔧</div><div class="stat-value blue">${_getContractors().length}</div><div class="stat-label">Active Contractors</div></div>
+      <div class="stat-card blue">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-value blue">${periodLeads.length}</div>
+        <div class="stat-label">Leads Created</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">${newC} new · ${assignedCount} assigned</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-icon">🔄</div>
+        <div class="stat-value yellow">${activePipeline}</div>
+        <div class="stat-label">Active Pipeline</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">Current open leads</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value green">${wonLeads.length}</div>
+        <div class="stat-label">Jobs Won</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">${lostCount} lost this period</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value cyan">$${revenue.toLocaleString()}</div>
+        <div class="stat-label">Revenue (Real Only)</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">Platform cut: $${fee.toLocaleString()}</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value blue">$${avgWon.toLocaleString()}</div>
+        <div class="stat-label">Avg Job Value</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">Won jobs only</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-icon">🔧</div>
+        <div class="stat-value blue">${realActive}</div>
+        <div class="stat-label">Active Contractors</div>
+        <div class="stat-change" style="color:var(--gray);font-size:.7rem">Real only</div>
+      </div>
     </div>
+
+    ${cPerf.length > 0 ? `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span>🏆</span><div class="card-title">Contractor Performance — ${_periodLabel(_dashPeriod)}</div></div>
+      <div class="card-body" style="padding:0">
+        <table class="leads-table"><thead><tr><th>Contractor</th><th>Jobs Won</th><th>Revenue</th><th>Platform Cut</th></tr></thead><tbody>
+        ${cPerf.map(x=>`<tr>
+          <td style="font-weight:600">${sanitizeHTML(x.c.companyName||x.c.name)}</td>
+          <td style="color:var(--green)">${x.jobs}</td>
+          <td style="color:var(--cyan);font-weight:600">$${x.rev.toLocaleString()}</td>
+          <td style="color:var(--gray)">$${Math.round(x.rev*settings.commissionPct/100).toLocaleString()}</td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>` : ''}
+
     <div class="two-col">
       <div class="card">
         <div class="card-header"><span>⚡</span><div class="card-title">Recent Leads</div><button class="btn btn-outline btn-sm" onclick="navTo('all-leads')">View All</button></div>
         <table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Description</th><th>Status</th><th></th></tr></thead><tbody>
         ${recent.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr>
-          <td><div class="lead-name">${l.name}</div><div class="lead-sub">${l.phone}</div></td>
-          <td>${l.county},${l.state}</td>
-          <td style="font-size:.8rem">${l.service}</td>
+          <td><div class="lead-name">${sanitizeHTML(l.name)}</div><div class="lead-sub">${sanitizeHTML(l.phone)}</div></td>
+          <td>${sanitizeHTML(l.county)},${sanitizeHTML(l.state)}</td>
+          <td style="font-size:.8rem">${sanitizeHTML(l.service)}</td>
           <td style="font-size:.8rem;color:var(--gray);max-width:160px">${cn ? `<span title="${sanitizeHTML(cn.text)}">${sanitizeHTML(cn.text.length>60?cn.text.slice(0,60)+'…':cn.text)}</span><button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Full details" style="margin-left:4px;font-size:.7rem">⬆</button>` : '—'}</td>
           <td><span class="badge badge-${l.status}">${cap(l.status)}</span>${l.priority==='high'?'<span class="warn-tag" style="margin-left:4px;font-size:.68rem">HIGH</span>':''}</td>
           <td><button class="btn-icon" onclick="openLeadDetail('${l.id}')">→</button></td>
@@ -1546,12 +1654,13 @@ function pgAdminDashboard() {
         </tbody></table>
       </div>
       <div class="card">
-        <div class="card-header"><span>🗺️</span><div class="card-title">Leads by County</div></div>
+        <div class="card-header"><span>🗺️</span><div class="card-title">Leads by County — ${_periodLabel(_dashPeriod)}</div></div>
         <div class="card-body" style="padding:16px 20px">
-          ${counties.map(c => { const cnt = leads.filter(l=>l.county===c).length; return `<div class="county-row"><div class="county-name">${c}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(cnt/maxC*100)}%"></div></div><div class="county-count">${cnt}</div></div>`;}).join('')}
+          ${counties.map(c => { const cnt = periodLeads.filter(l=>l.county===c).length; return `<div class="county-row"><div class="county-name">${c}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(cnt/maxC*100)}%"></div></div><div class="county-count">${cnt}</div></div>`;}).join('')}
         </div>
       </div>
     </div>
+
     <div class="two-col">
       <div class="card">
         <div class="card-header"><span>🕐</span><div class="card-title">Recent Activity</div></div>
@@ -1567,10 +1676,11 @@ function pgAdminDashboard() {
         <div class="card-body" id="followup-list" style="padding:8px 0"></div>
       </div>
     </div>
+
     <div class="card" style="margin-top:0">
-      <div class="card-header"><span>📊</span><div class="card-title">Lead Source Performance</div></div>
+      <div class="card-header"><span>📊</span><div class="card-title">Lead Source Performance — ${_periodLabel(_dashPeriod)}</div></div>
       <div class="card-body" style="padding:16px 20px">
-        ${(()=>{const sources=['Google Ads','SEO','Facebook Ads','Direct'];const maxS=Math.max(...sources.map(s=>leads.filter(l=>l.leadSource===s).length),1);return sources.map(s=>{const cnt=leads.filter(l=>l.leadSource===s).length;const won=leads.filter(l=>l.leadSource===s&&l.status==='completed').length;return`<div class="county-row"><div class="county-name" style="width:120px">${s}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(cnt/maxS*100)}%"></div></div><div class="county-count" style="width:30px">${cnt}</div><div style="font-size:.72rem;color:var(--green);width:60px">${cnt?Math.round(won/cnt*100)+'% close':''}</div></div>`;}).join('');})()}
+        ${(()=>{const sources=['Google Ads','SEO','Facebook Ads','Direct'];const maxS=Math.max(...sources.map(s=>periodLeads.filter(l=>l.leadSource===s).length),1);return sources.map(s=>{const cnt=periodLeads.filter(l=>l.leadSource===s).length;const won=periodLeads.filter(l=>l.leadSource===s&&l.status==='completed').length;return`<div class="county-row"><div class="county-name" style="width:120px">${s}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(cnt/maxS*100)}%"></div></div><div class="county-count" style="width:30px">${cnt}</div><div style="font-size:.72rem;color:var(--green);width:60px">${cnt?Math.round(won/cnt*100)+'% close':''}</div></div>`;}).join('');})()}
       </div>
     </div>
   </div>`;
@@ -1791,36 +1901,63 @@ function pgContractors() {
       </div>
     </div>`;
   }
+  const realCount = list.filter(c => (c.contractorType||'real') !== 'demo').length;
+  const demoCount = list.filter(c => (c.contractorType||'real') === 'demo').length;
   return `<div class="page" id="page-contractors">
-    <div class="page-header"><div><h1>Contractors</h1><p>${list.length} active partner contractor${list.length !== 1 ? 's' : ''}</p></div>
-    <button class="btn btn-primary" onclick="showAddContractorModal()">+ Add Contractor</button></div>
+    <div class="page-header">
+      <div>
+        <h1>Contractors</h1>
+        <p>${realCount} real · ${demoCount} demo · ${list.filter(c=>c.isActive!==false).length} active</p>
+      </div>
+      <button class="btn btn-primary" onclick="showAddContractorModal()">+ Add Contractor</button>
+    </div>
     <div style="display:flex;flex-direction:column;gap:14px">
     ${list.map(c => {
+      const isDemo     = (c.contractorType || 'real') === 'demo';
+      const isInactive = c.isActive === false;
       const cLeads     = leads.filter(l => l.contractor === c.id);
       const cCompleted = cLeads.filter(l => l.status === 'completed');
-      const cRevenue   = cCompleted.reduce((s, l) => s + _revAmount(l), 0);
+      const cRevenue   = isDemo ? 0 : cCompleted.reduce((s, l) => s + _revenueValue(l), 0);
       const initial    = (c.companyName || c.name || '?')[0].toUpperCase();
-      const inviteTag  = c.lastLoginAt
+
+      // Type badge
+      const typeBadge = isDemo
+        ? `<span style="font-size:.68rem;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:2px 7px;margin-left:6px;letter-spacing:.04em">DEMO</span>`
+        : `<span style="font-size:.68rem;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.25);border-radius:4px;padding:2px 7px;margin-left:6px;letter-spacing:.04em">REAL</span>`;
+
+      // Status badge
+      const statusBadge = isInactive
+        ? `<span class="badge" style="font-size:.7rem;margin-left:6px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)">Inactive</span>`
+        : `<span class="badge badge-completed" style="font-size:.7rem;margin-left:6px">Active</span>`;
+
+      // Invite badge
+      const inviteTag = c.lastLoginAt
         ? `<span class="badge badge-completed" style="font-size:.68rem;margin-left:6px">Activated</span>`
         : c.invitedAt
           ? `<span class="badge" style="font-size:.68rem;margin-left:6px;background:rgba(59,130,246,.15);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)">Invite Sent</span>`
           : `<span class="badge" style="font-size:.68rem;margin-left:6px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">Pending Invite</span>`;
-      return `<div class="contractor-card">
-        <div class="contractor-avatar" style="background:linear-gradient(135deg,var(--blue-bright),var(--green))">${initial}</div>
+
+      return `<div class="contractor-card" style="${isInactive?'opacity:.7':''}">
+        <div class="contractor-avatar" style="background:${isDemo?'linear-gradient(135deg,#f59e0b,#d97706)':'linear-gradient(135deg,var(--blue-bright),var(--green))'}">${initial}</div>
         <div class="contractor-info">
-          <div class="contractor-name">${sanitizeHTML(c.companyName || c.name)} ${c.isActive !== false ? `<span class="badge badge-completed" style="font-size:.7rem;margin-left:6px">Active</span>` : `<span class="badge" style="font-size:.7rem;margin-left:6px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)">Inactive</span>`}${inviteTag}</div>
+          <div class="contractor-name">${sanitizeHTML(c.companyName || c.name)}${typeBadge}${statusBadge}${inviteTag}</div>
           <div class="contractor-meta">${sanitizeHTML(c.contactName || c.contact)} · ${sanitizeHTML(c.phone)} · ${sanitizeHTML(c.email)}</div>
           <div class="contractor-meta" style="margin-top:3px">🪪 ${sanitizeHTML(c.license || '—')} &nbsp;·&nbsp; 📍 ${sanitizeHTML((c.counties || []).slice(0,4).join(', '))}${(c.counties||[]).length > 4 ? ` +${c.counties.length-4} more` : ''}</div>
+          ${isDemo ? `<div style="font-size:.72rem;color:#f59e0b;margin-top:4px">⚠ Demo contractor — excluded from all business reporting</div>` : ''}
         </div>
         <div class="contractor-stats">
           <div><div class="c-stat-val">${cLeads.length}</div><div class="c-stat-lbl">Leads</div></div>
           <div><div class="c-stat-val" style="color:var(--green)">${cCompleted.length}</div><div class="c-stat-lbl">Won</div></div>
-          <div><div class="c-stat-val" style="color:var(--cyan)">$${(cRevenue/1000).toFixed(1)}k</div><div class="c-stat-lbl">Revenue</div></div>
+          <div><div class="c-stat-val" style="color:${isDemo?'var(--gray)':'var(--cyan)'}">${isDemo?'—':'$'+(cRevenue/1000).toFixed(1)+'k'}</div><div class="c-stat-lbl">Revenue</div></div>
           <div><div class="c-stat-val" style="color:var(--yellow)">⭐${c.rating || '—'}</div><div class="c-stat-lbl">Rating</div></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
           <button class="btn btn-outline btn-sm" onclick="editContractor('${c.id}')">✏️ Edit</button>
           <button class="btn btn-outline btn-sm" onclick="viewContractor('${c.id}')">Details →</button>
+          ${isInactive
+            ? `<button class="btn btn-sm" style="background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.3)" onclick="reactivateContractor('${c.id}')">Reactivate</button>`
+            : `<button class="btn btn-sm" style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.3)" onclick="deactivateContractor('${c.id}')">Deactivate</button>`
+          }
           ${c.lastLoginAt ? '' : c.invitedAt
             ? `<button class="btn btn-sm" id="invite-btn-${c.id}" style="background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.35)" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Resend Invite</button>`
             : `<button class="btn btn-sm" id="invite-btn-${c.id}" style="background:rgba(59,130,246,.15);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)" onclick="sendContractorInvite('${c.id}','${sanitizeHTML(c.email)}')">Send Invite</button>`
@@ -1877,6 +2014,13 @@ function showAddContractorModal() {
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">License #</label><input class="form-input" id="ac-lic" placeholder="PA-EL-XXXXX or NJ-EL-XXXXX"></div>
+      <div class="form-group">
+        <label class="form-label">Contractor Type</label>
+        <select class="form-input" id="ac-type">
+          <option value="real" selected>Real (included in reporting)</option>
+          <option value="demo">Demo (testing only — excluded from reporting)</option>
+        </select>
+      </div>
     </div>
     <div id="ac-error" style="display:none;color:var(--red);font-size:.82rem;margin-top:8px"></div>`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
@@ -1888,8 +2032,9 @@ async function saveContractorRecord() {
   const contact = document.getElementById('ac-contact')?.value.trim() ?? '';
   const email   = document.getElementById('ac-email')?.value.trim().toLowerCase() ?? '';
   const phone   = document.getElementById('ac-phone')?.value.trim() ?? '';
-  const license = document.getElementById('ac-lic')?.value.trim()   ?? '';
-  const errEl   = document.getElementById('ac-error');
+  const license        = document.getElementById('ac-lic')?.value.trim()  ?? '';
+  const contractorType = document.getElementById('ac-type')?.value        ?? 'real';
+  const errEl          = document.getElementById('ac-error');
   const submitBtn = document.getElementById('ac-submit-btn');
 
   if (!company || !contact || !email) {
@@ -1909,8 +2054,9 @@ async function saveContractorRecord() {
     if (errEl) errEl.style.display = 'none';
 
     const result = await sbInviteContractor(null, email, {
-      company_name: company,
-      contact_name: contact,
+      company_name:    company,
+      contact_name:    contact,
+      contractor_type: contractorType,
     });
 
     if (result.error) {
@@ -1951,8 +2097,9 @@ async function saveContractorRecord() {
     completed:   0,
     revenue:     0,
     rating:      5.0,
-    status:      'active',
-    isActive:    true,
+    status:          'active',
+    isActive:        true,
+    contractorType:  contractorType,
   };
   dbContractors.push(newRecord);
   const why = isSupabaseReady() ? ' (DEV_MODE — sign in via Supabase to send a real invite)' : ' (no Supabase configured)';
@@ -2046,6 +2193,16 @@ function editContractor(id) {
         </select>
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Contractor Type</label>
+        <select class="form-input" id="ec-type">
+          <option value="real"  ${(c.contractorType||'real')==='real' ?'selected':''}>Real (included in reporting)</option>
+          <option value="demo"  ${(c.contractorType||'real')==='demo' ?'selected':''}>Demo (testing only — excluded from all reporting)</option>
+        </select>
+        <div style="font-size:.74rem;color:var(--gray);margin-top:4px">Demo contractors are excluded from revenue, platform cut, and monthly reports.</div>
+      </div>
+    </div>
     <div class="form-group"><label class="form-label">Service Counties</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
         ${counties.map(co => `<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;cursor:pointer">
@@ -2076,7 +2233,8 @@ async function saveContractorEdit(id) {
   const counties = ['Philadelphia','Montgomery','Bucks','Chester','Delaware','Burlington','Camden','Gloucester'];
   const selectedCounties = counties.filter(co => document.getElementById(`ec-co-${co.toLowerCase()}`)?.checked);
 
-  const updates = { companyName: company, name: company, contactName: contact, contact, email, phone, license, status, counties: selectedCounties, isActive: status === 'active' };
+  const contractorType = document.getElementById('ec-type')?.value ?? 'real';
+  const updates = { companyName: company, name: company, contactName: contact, contact, email, phone, license, status, counties: selectedCounties, isActive: status === 'active', contractorType };
 
   const rec = dbContractors.find(x => x.id === id);
   if (rec) Object.assign(rec, updates);
@@ -2093,26 +2251,87 @@ async function saveContractorEdit(id) {
   showToast(`Contractor "${company}" updated.`);
 }
 
+/**
+ * Safe delete entry point.
+ * REAL contractors with any completed jobs → blocked, must deactivate instead.
+ * DEMO contractors → prompt to handle associated leads.
+ * REAL with no jobs → standard confirm + delete.
+ */
 function deleteContractor(id) {
   const c = _getContractors().find(x => x.id === id);
   if (!c) return;
-  const name = c.companyName || c.name || 'this contractor';
+  const name     = c.companyName || c.name || 'this contractor';
+  const isDemo   = (c.contractorType || 'real') === 'demo';
+  const cLeads   = leads.filter(l => l.contractor === id);
+  const hasJobs  = leads.some(l => l.contractor === id && l.status === 'completed');
+
+  // Real contractor with historical jobs — BLOCK deletion
+  if (!isDemo && hasJobs) {
+    openModalWith('Cannot Delete Contractor',
+      `<div class="alert-box warn">🔒 <div><strong>"${sanitizeHTML(name)}" has historical job data and cannot be deleted.</strong><br><br>
+       Deleting contractors with completed jobs would corrupt your revenue history and bookkeeping records.<br><br>
+       <strong>Deactivate instead</strong> — the contractor cannot log in or receive new leads, but all historical data is preserved.</div></div>`,
+      `<button class="btn btn-outline" onclick="closeModalDirect()">Close</button>
+       <button class="btn btn-primary" onclick="closeModalDirect();deactivateContractor('${id}')">Deactivate Instead</button>`
+    );
+    return;
+  }
+
+  // Demo contractor with leads — prompt for lead handling
+  if (isDemo && cLeads.length > 0) {
+    openModalWith('Delete Demo Contractor',
+      `<div class="alert-box warn">⚠️ <div><strong>"${sanitizeHTML(name)}" has ${cLeads.length} associated lead${cLeads.length!==1?'s':''}.</strong><br>Choose what to do with these leads before deleting.</div></div>
+       <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+         <div style="font-size:.82rem;color:var(--gray)">How should the associated leads be handled?</div>
+       </div>`,
+      `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+       <button class="btn btn-sm" style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)" onclick="confirmDemoDelete('${id}','delete-leads')">Delete Demo Leads</button>
+       <button class="btn btn-sm" style="background:rgba(59,130,246,.12);color:var(--blue-bright);border:1px solid rgba(59,130,246,.3)" onclick="confirmDemoDelete('${id}','unassign-leads')">Unassign Leads</button>`
+    );
+    return;
+  }
+
+  // Standard confirm (real with no jobs, or demo with no leads)
   openModalWith('Delete Contractor',
-    `<div class="alert-box warn">⚠️ <div><strong>Are you sure you want to delete "${sanitizeHTML(name)}"?</strong><br>This cannot be undone. Any leads assigned to them will become unassigned.</div></div>`,
+    `<div class="alert-box warn">⚠️ <div><strong>Delete "${sanitizeHTML(name)}"?</strong><br>This cannot be undone.</div></div>`,
     `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
-     <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);padding:8px 18px" onclick="confirmDeleteContractor('${id}')">Yes, Delete</button>`
+     <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);padding:8px 18px" onclick="confirmDeleteContractor('${id}','none')">Yes, Delete</button>`
   );
+}
+
+async function confirmDemoDelete(id, leadAction) {
+  closeModalDirect();
+  if (leadAction === 'delete-leads') {
+    // Remove all leads assigned to this demo contractor from in-memory array
+    const toRemove = new Set(leads.filter(l => l.contractor === id).map(l => l.id));
+    leads.splice(0, leads.length, ...leads.filter(l => !toRemove.has(l.id)));
+    if (isSupabaseReady()) {
+      const { error } = await (_db()?.from('leads').delete().eq('contractor_id', id) ?? Promise.resolve({ error: null }));
+      if (error) console.error('[DB] delete demo leads:', error.message);
+    }
+  } else {
+    // Unassign leads back to pool
+    leads.forEach(l => { if (l.contractor === id) { l.contractor = null; l.status = 'new'; } });
+    if (isSupabaseReady()) {
+      const { error } = await (_db()?.from('leads').update({ contractor_id: null, status: 'new' }).eq('contractor_id', id) ?? Promise.resolve({ error: null }));
+      if (error) console.error('[DB] unassign demo leads:', error.message);
+    }
+  }
+  await _doHardDeleteContractor(id);
 }
 
 async function confirmDeleteContractor(id) {
   closeModalDirect();
-  // Remove from in-memory array
-  const idx = dbContractors.findIndex(x => x.id === id);
-  if (idx !== -1) dbContractors.splice(idx, 1);
   // Unassign any leads that referenced this contractor
   leads.forEach(l => { if (l.contractor === id) { l.contractor = null; l.status = 'new'; } });
+  await _doHardDeleteContractor(id);
+}
+
+/** Internal: hard-delete a contractor from memory + DB. */
+async function _doHardDeleteContractor(id) {
+  const idx = dbContractors.findIndex(x => x.id === id);
+  if (idx !== -1) dbContractors.splice(idx, 1);
   persist();
-  // Delete from DB
   if (isSupabaseReady()) {
     const { error } = await (_db()?.from('contractors').delete().eq('id', id) ?? Promise.resolve({ error: null }));
     if (error) console.error('[DB] deleteContractor:', error.message);
@@ -2122,14 +2341,157 @@ async function confirmDeleteContractor(id) {
   showToast('Contractor removed.');
 }
 
+/**
+ * Deactivate a contractor — blocks login + new lead assignment.
+ * All historical jobs, revenue, and notes are preserved.
+ */
+async function deactivateContractor(id) {
+  const c = _getContractors().find(x => x.id === id);
+  if (!c) return;
+  const name = c.companyName || c.name || 'this contractor';
+  openModalWith('Deactivate Contractor',
+    `<div class="alert-box warn">⚠️ <div><strong>Deactivate "${sanitizeHTML(name)}"?</strong><br><br>
+     The contractor <strong>cannot log in</strong> and will not receive new lead assignments.<br>
+     All historical jobs, revenue, and bookkeeping records are preserved.<br>
+     You can reactivate them at any time.</div></div>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-sm" style="background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:8px 18px" onclick="confirmDeactivateContractor('${id}')">Yes, Deactivate</button>`
+  );
+}
+
+async function confirmDeactivateContractor(id) {
+  closeModalDirect();
+  const rec = dbContractors.find(x => x.id === id);
+  if (rec) { rec.isActive = false; rec.status = 'inactive'; }
+  if (isSupabaseReady()) {
+    const saved = await sbUpdateContractor(id, { isActive: false, status: 'inactive' });
+    if (!saved) console.error('[DB] deactivateContractor failed for', id);
+  }
+  buildPages();
+  navTo('contractors');
+  showToast('Contractor deactivated — historical data preserved.');
+}
+
+/**
+ * Reactivate an inactive contractor — restores login and lead assignment.
+ */
+async function reactivateContractor(id) {
+  const c = _getContractors().find(x => x.id === id);
+  if (!c) return;
+  const name = c.companyName || c.name || 'this contractor';
+  openModalWith('Reactivate Contractor',
+    `<p style="color:var(--silver)">Reactivate <strong>${sanitizeHTML(name)}</strong>? They will be able to log in and receive new lead assignments again.</p>`,
+    `<button class="btn btn-outline" onclick="closeModalDirect()">Cancel</button>
+     <button class="btn btn-primary" onclick="confirmReactivateContractor('${id}')">Yes, Reactivate</button>`
+  );
+}
+
+async function confirmReactivateContractor(id) {
+  closeModalDirect();
+  const rec = dbContractors.find(x => x.id === id);
+  if (rec) { rec.isActive = true; rec.status = 'active'; }
+  if (isSupabaseReady()) {
+    const saved = await sbUpdateContractor(id, { isActive: true, status: 'active' });
+    if (!saved) console.error('[DB] reactivateContractor failed for', id);
+  }
+  buildPages();
+  navTo('contractors');
+  showToast('Contractor reactivated.');
+}
+
 // ─── REVENUE HELPERS ────────────────────────────────────────────
 /**
- * True revenue amount for a lead.
+ * Display amount for a lead — used in pipeline cards, tables, tooltips.
  * Priority: contractor-entered quote > original estimated value.
- * Estimated value is NEVER used as final revenue once a real quote exists.
+ * NOT for revenue aggregation — use _revenueValue() for that.
  */
 function _revAmount(l) {
   return l.quoteAmount != null ? Number(l.quoteAmount) : (l.value || 0);
+}
+
+/**
+ * Canonical revenue amount for a COMPLETED lead.
+ * Source of truth for all revenue reporting, dashboard stats, and platform cut.
+ * Priority: final_value (locked at win time) > quote_amount > estimated value.
+ * Returns 0 for non-completed leads so callers never need to filter first.
+ */
+function _revenueValue(l) {
+  if (l.status !== 'completed') return 0;
+  if (l.finalValue  != null) return Number(l.finalValue);
+  if (l.quoteAmount != null) return Number(l.quoteAmount);
+  return l.value || 0;
+}
+
+/**
+ * Returns {start: Date, end: Date} for the given reporting period.
+ * 'this-month' (default) | 'last-month' | '90-days' | 'all'
+ */
+function _dateRange(period) {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = now.getMonth();
+  if (period === 'this-month') return { start: new Date(y, m, 1),   end: new Date(y, m + 1, 1) };
+  if (period === 'last-month') return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
+  if (period === '90-days')    { const s = new Date(); s.setDate(s.getDate() - 90); return { start: s, end: new Date(now.getTime() + 86400000) }; }
+  return { start: new Date(0), end: new Date(now.getTime() + 86400000) }; // all
+}
+
+/**
+ * Returns true if the given ISO timestamp string falls within the date range.
+ * If period is 'all', always returns true.
+ */
+function _inRange(isoStr, range) {
+  if (!isoStr) return false;
+  const d = new Date(isoStr);
+  return d >= range.start && d < range.end;
+}
+
+/**
+ * Returns all contractors that are NOT demo type.
+ * Use this for revenue reporting, platform cut, and admin analytics.
+ * Includes inactive contractors so historical revenue is preserved.
+ */
+function _realContractors() {
+  return dbContractors.filter(c => (c.contractorType || 'real') !== 'demo');
+}
+
+/**
+ * Returns Set of contractor IDs that are demo type.
+ * Use this to quickly exclude demo leads from revenue aggregations.
+ */
+function _demoContractorIds() {
+  return new Set(dbContractors.filter(c => (c.contractorType || 'real') === 'demo').map(c => c.id));
+}
+
+/**
+ * Returns the human-readable label for a period key.
+ */
+function _periodLabel(period) {
+  return { 'this-month': 'This Month', 'last-month': 'Last Month', '90-days': 'Last 90 Days', 'all': 'All Time' }[period] || 'This Month';
+}
+
+/** Rebuild and activate the dashboard page with the current period. */
+function setDashPeriod(period) {
+  _dashPeriod = period;
+  refreshAdminDashboard();
+}
+
+/** Rebuild and activate the revenue page with the current period. */
+function setRevPeriod(period) {
+  _revPeriod = period;
+  refreshRevenuePage();
+}
+
+/** Replaces the revenue page node with freshly computed HTML. */
+function refreshRevenuePage() {
+  const el = document.getElementById('page-revenue');
+  if (!el) return;
+  const wasActive = el.classList.contains('active');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = pgRevenue();
+  const newEl = tmp.firstElementChild;
+  if (wasActive) newEl.classList.add('active');
+  el.parentNode.replaceChild(newEl, el);
 }
 
 /**
@@ -2142,12 +2504,17 @@ function _revAmount(l) {
  */
 function _priceTag(l, compact) {
   let amount, label, color, labelColor;
-  if (l.quoteAmount != null) {
+  if (l.status === 'completed' && (l.finalValue != null || l.quoteAmount != null)) {
+    // Job Won — show locked-in final amount
+    amount     = l.finalValue != null ? Number(l.finalValue) : Number(l.quoteAmount);
+    label      = 'Final';
+    color      = 'var(--green)';
+    labelColor = '#4ade80';
+  } else if (l.quoteAmount != null) {
     amount     = Number(l.quoteAmount);
-    const isWon = l.status === 'completed';
-    label      = isWon ? 'Final' : 'Quoted';
-    color      = isWon ? 'var(--green)' : '#a78bfa';
-    labelColor = isWon ? '#4ade80' : '#c4b5fd';
+    label      = 'Quoted';
+    color      = '#a78bfa';
+    labelColor = '#c4b5fd';
   } else {
     amount     = l.value || 0;
     label      = 'Est.';
@@ -2165,40 +2532,92 @@ function _priceTag(l, compact) {
 
 // ─── REVENUE ────────────────────────────────────────────────────
 function pgRevenue() {
-  const done  = leads.filter(l=>l.status==='completed');
-  const total = done.reduce((s,l)=>s+_revAmount(l),0);
-  const fee   = Math.round(total * settings.commissionPct/100);
-  const bars  = [3200,4800,5100,6200,7400,total];
-  const months= ['Oct','Nov','Dec','Jan','Feb','Mar'];
-  const maxB  = Math.max(...bars);
+  // ── Period setup ─────────────────────────────────────────────
+  const range    = _dateRange(_revPeriod);
+  const isAll    = _revPeriod === 'all';
+  const inWon    = l => isAll || _inRange(l.wonAt, range);
+  const demoIds  = _demoContractorIds();
+  const realCtrs = _realContractors();
+
+  // ── Won leads: filter by won_at, exclude demo ─────────────────
+  const done  = leads.filter(l => l.status === 'completed' && inWon(l) && (!l.contractor || !demoIds.has(l.contractor)));
+  const total = done.reduce((s,l) => s + _revenueValue(l), 0);
+  const fee   = Math.round(total * settings.commissionPct / 100);
+
+  // ── Real monthly bars — last 6 calendar months ───────────────
+  const now = new Date();
+  const monthBars = Array.from({length:6}, (_,i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5-i), 1);
+    const end = new Date(d.getFullYear(), d.getMonth()+1, 1);
+    const label = d.toLocaleDateString('en-US',{month:'short'});
+    const rev = leads.filter(l =>
+      l.status === 'completed' &&
+      _inRange(l.wonAt, { start:d, end }) &&
+      (!l.contractor || !demoIds.has(l.contractor))
+    ).reduce((s,l) => s + _revenueValue(l), 0);
+    return { label, rev, isCurrent: i===5 };
+  });
+  const maxB = Math.max(...monthBars.map(b=>b.rev), 1);
+
+  // ── Period picker ────────────────────────────────────────────
+  const picker = `<select class="form-input" style="width:auto;padding:6px 10px;font-size:.82rem;background:var(--navy-mid);color:var(--white);border:1px solid var(--navy-border);cursor:pointer" onchange="setRevPeriod(this.value)">
+    <option value="this-month" ${_revPeriod==='this-month'?'selected':''}>This Month</option>
+    <option value="last-month" ${_revPeriod==='last-month'?'selected':''}>Last Month</option>
+    <option value="90-days"    ${_revPeriod==='90-days'   ?'selected':''}>Last 90 Days</option>
+    <option value="all"        ${_revPeriod==='all'       ?'selected':''}>All Time</option>
+  </select>`;
+
   return `<div class="page" id="page-revenue">
-    <div class="page-header"><div><h1>Revenue & Billing</h1><p>Commissions, lead fees, contractor payouts</p></div>
-    <button class="btn btn-outline btn-sm" onclick="exportCSV('completed')">⬇ Export</button></div>
+    <div class="page-header">
+      <div><h1>Revenue & Billing</h1><p>Real contractors only · ${_periodLabel(_revPeriod)} · Platform fee ${settings.commissionPct}%</p></div>
+      <div class="page-header-actions" style="gap:8px">
+        ${picker}
+        <button class="btn btn-outline btn-sm" onclick="exportCSV('completed')">⬇ Export</button>
+      </div>
+    </div>
     <div class="stats-grid">
-      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-value green">$${total.toLocaleString()}</div><div class="stat-label">Total Job Value</div></div>
-      <div class="stat-card cyan"><div class="stat-icon">💸</div><div class="stat-value cyan">$${fee.toLocaleString()}</div><div class="stat-label">Platform Fee (${settings.commissionPct}%)</div></div>
-      <div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-value blue">${done.length}</div><div class="stat-label">Completed Jobs</div></div>
+      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-value green">$${total.toLocaleString()}</div><div class="stat-label">Total Revenue</div></div>
+      <div class="stat-card cyan"><div class="stat-icon">💸</div><div class="stat-value cyan">$${fee.toLocaleString()}</div><div class="stat-label">Platform Cut (${settings.commissionPct}%)</div></div>
+      <div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-value blue">${done.length}</div><div class="stat-label">Jobs Won</div></div>
       <div class="stat-card yellow"><div class="stat-icon">📊</div><div class="stat-value yellow">$${Math.round(total/(done.length||1)).toLocaleString()}</div><div class="stat-label">Avg Job Value</div></div>
     </div>
     <div class="grid-2">
-      <div class="card"><div class="card-header"><span>📈</span><div class="card-title">Monthly Revenue Trend</div></div>
+      <div class="card"><div class="card-header"><span>📈</span><div class="card-title">Monthly Revenue Trend (Last 6 Months)</div></div>
         <div class="card-body"><div class="revenue-chart">
-          ${months.map((m,i) => { const h=Math.round((bars[i]/maxB)*110); return `<div class="rev-bar-wrap"><div class="rev-bar ${i===months.length-1?'current':''}" style="height:${h}px"></div><div class="rev-month">${m}</div></div>`;}).join('')}
+          ${monthBars.map(b => { const h=Math.round((b.rev/maxB)*110)||2; return `<div class="rev-bar-wrap"><div class="rev-bar ${b.isCurrent?'current':''}" style="height:${h}px" title="$${b.rev.toLocaleString()}"></div><div class="rev-month">${b.label}</div></div>`;}).join('')}
         </div></div>
       </div>
-      <div class="card"><div class="card-header"><span>🔧</span><div class="card-title">By Contractor</div></div>
+      <div class="card"><div class="card-header"><span>🔧</span><div class="card-title">By Contractor — ${_periodLabel(_revPeriod)}</div></div>
         <div class="card-body">
-          ${(()=>{ const cs=_getContractors(); const cRevMap={}; done.forEach(l=>{ if(l.contractor) cRevMap[l.contractor]=(cRevMap[l.contractor]||0)+_revAmount(l); }); const maxRev=Math.max(...cs.map(x=>cRevMap[x.id]||0),1); return cs.map(c=>{ const rev=cRevMap[c.id]||0; return `<div class="county-row"><div class="county-name" style="width:140px">${sanitizeHTML(c.companyName||c.name)}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(rev/maxRev*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(rev/1000).toFixed(1)}k</div></div>`; }).join(''); })()}
-          <div style="margin-top:16px;font-size:.8rem;color:var(--gray)">Platform fee per contractor at ${settings.commissionPct}% commission rate</div>
+          ${(()=>{
+            const cRevMap={};
+            done.forEach(l=>{ if(l.contractor) cRevMap[l.contractor]=(cRevMap[l.contractor]||0)+_revenueValue(l); });
+            const maxRev=Math.max(...realCtrs.map(x=>cRevMap[x.id]||0),1);
+            return realCtrs.map(c=>{ const rev=cRevMap[c.id]||0; const isBadge=(c.contractorType||'real')==='demo'?'<span style="font-size:.6rem;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:3px;padding:1px 5px;margin-left:4px">DEMO</span>':''; return `<div class="county-row"><div class="county-name" style="width:140px">${sanitizeHTML(c.companyName||c.name)}${isBadge}</div><div class="county-bar-wrap"><div class="county-bar" style="width:${Math.round(rev/maxRev*100)}%"></div></div><div class="county-count" style="width:60px;color:var(--green)">$${(rev/1000).toFixed(1)}k</div></div>`; }).join('');
+          })()}
+          <div style="margin-top:16px;font-size:.8rem;color:var(--gray)">Platform cut at ${settings.commissionPct}% · Demo contractors excluded from all figures</div>
         </div>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><span>✅</span><div class="card-title">Completed Jobs</div></div>
-      ${done.length===0?`<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No completed jobs yet</h3></div>`
-      :`<table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Contractor</th><th>Job Value</th><th>Platform Fee</th><th>Date</th></tr></thead><tbody>
-        ${done.map(l=>{const c=_getContractors().find(x=>x.id===l.contractor); const rv=_revAmount(l); const isQuoted=l.quoteAmount!=null; return `<tr><td>${l.name}</td><td>${l.county},${l.state}</td><td style="font-size:.8rem">${l.service}</td><td style="font-size:.82rem">${c?sanitizeHTML(c.companyName||c.name):'—'}</td><td style="color:var(--green);font-weight:600">$${rv.toLocaleString()}${isQuoted?'<span style="font-size:.65rem;color:#a78bfa;margin-left:4px">quoted</span>':''}</td><td style="color:var(--cyan)">$${Math.round(rv*settings.commissionPct/100).toLocaleString()}</td><td style="font-size:.8rem;color:var(--gray)">${l.created}</td></tr>`;}).join('')}
-      </tbody></table>`}
+      <div class="card-header"><span>✅</span><div class="card-title">Won Jobs — ${_periodLabel(_revPeriod)}</div></div>
+      ${done.length===0
+        ? `<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No jobs won in this period</h3></div>`
+        : `<table class="leads-table"><thead><tr><th>Customer</th><th>County</th><th>Service</th><th>Contractor</th><th>Final Value</th><th>Platform Cut</th><th>Won Date</th></tr></thead><tbody>
+        ${done.map(l=>{
+          const c = _getContractors().find(x=>x.id===l.contractor);
+          const rv = _revenueValue(l);
+          const wonDate = l.wonAt ? new Date(l.wonAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : (l.created||'—');
+          return `<tr>
+            <td>${sanitizeHTML(l.name)}</td>
+            <td>${sanitizeHTML(l.county)},${sanitizeHTML(l.state)}</td>
+            <td style="font-size:.8rem">${sanitizeHTML(l.service)}</td>
+            <td style="font-size:.82rem">${c?sanitizeHTML(c.companyName||c.name):'—'}</td>
+            <td>${_priceTag(l)}</td>
+            <td style="color:var(--cyan)">$${Math.round(rv*settings.commissionPct/100).toLocaleString()}</td>
+            <td style="font-size:.8rem;color:var(--gray)">${wonDate}</td>
+          </tr>`;}).join('')}
+        </tbody></table>`}
     </div>
   </div>`;
 }
@@ -2469,6 +2888,35 @@ function pgSettings() {
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span>📧</span><div class="card-title">Monthly Business Report Email</div></div>
+      <div class="card-body">
+        <p style="font-size:.875rem;color:var(--gray);margin-bottom:16px">
+          Automatically emails a business summary on the 1st of each month — new leads, revenue won, platform cut, and per-contractor breakdown. Demo contractors are always excluded.
+        </p>
+        <div class="grid-2" style="gap:16px;margin-bottom:16px">
+          <div class="form-group">
+            <label class="form-label">Resend API Key</label>
+            <input class="form-input" id="s-resend" type="password" value="${settings.resendApiKey||''}" placeholder="re_...">
+            <div style="font-size:.75rem;color:var(--gray);margin-top:4px">Get from <a href="https://resend.com" target="_blank" style="color:var(--blue-bright)">resend.com</a> → API Keys. Required to send monthly emails.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Report Recipient Email</label>
+            <input class="form-input" id="s-report-email" value="${settings.reportEmail||settings.adminEmail}" placeholder="admin@example.com">
+            <div style="font-size:.75rem;color:var(--gray);margin-top:4px">Who receives the monthly report. Defaults to admin email.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="sendMonthlyReport('last-month')">📤 Send Last Month's Report Now</button>
+          <button class="btn" onclick="sendMonthlyReport('this-month')" style="background:var(--surface-2)">📤 Send This Month (Preview)</button>
+          <span id="monthly-report-status" style="font-size:.8rem;color:var(--gray)"></span>
+        </div>
+        <div class="alert-box info" style="margin-top:14px">
+          💡 <div>The report auto-sends on the 1st of each month via a Supabase scheduled job (pg_cron). Run <code>supabase/monthly_report_cron.sql</code> once in your Supabase SQL Editor to enable it.</div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header"><span>🛡️</span><div class="card-title">Security & Infrastructure</div></div>
       <div class="card-body" style="padding:8px 22px">
@@ -2500,11 +2948,89 @@ function saveSettings() {
   settings.njPhone     = document.getElementById('s-njphone')?.value    || settings.njPhone;
   settings.formspreeId   = document.getElementById('s-formspree')?.value  || settings.formspreeId;
   settings.googleMapsKey = (document.getElementById('s-gmap')?.value ?? '').trim();
-  settings.commissionPct = parseInt(document.getElementById('s-commission')?.value) || settings.commissionPct;
-  settings.leadFee       = parseInt(document.getElementById('s-leadfee')?.value)    || settings.leadFee;
+  settings.commissionPct  = parseInt(document.getElementById('s-commission')?.value) || settings.commissionPct;
+  settings.leadFee        = parseInt(document.getElementById('s-leadfee')?.value)    || settings.leadFee;
+  const resendVal = (document.getElementById('s-resend')?.value ?? '').trim();
+  if (resendVal) settings.resendApiKey = resendVal;
+  settings.reportEmail = (document.getElementById('s-report-email')?.value ?? '').trim() || settings.reportEmail;
   persist();
   if (isSupabaseReady()) sbUpdateSettings(settings).catch(e => console.warn('[DB] updateSettings:', e.message));
   showToast('Settings saved!');
+}
+
+async function sendMonthlyReport(period) {
+  const statusEl = document.getElementById('monthly-report-status');
+  if (statusEl) statusEl.textContent = 'Sending…';
+
+  // Save any unsaved API key first
+  const resendVal = (document.getElementById('s-resend')?.value ?? '').trim();
+  if (resendVal) { settings.resendApiKey = resendVal; persist(); }
+
+  const apiKey = settings.resendApiKey || '';
+  if (!apiKey) {
+    if (statusEl) statusEl.textContent = '❌ No Resend API key — save one above first.';
+    showToast('Add your Resend API key in Settings first.', 'error');
+    return;
+  }
+
+  const recipient = settings.reportEmail || settings.adminEmail;
+  if (!recipient) {
+    if (statusEl) statusEl.textContent = '❌ No recipient email configured.';
+    return;
+  }
+
+  // Build report data from in-memory state
+  const range       = _dateRange(period);
+  const demoIds     = _demoContractorIds();
+  const realLeads   = leads.filter(l => !demoIds.has(l.contractorId));
+  const periodLeads = realLeads.filter(l => _inRange(l.createdAt || l.date, range));
+  const wonLeads    = realLeads.filter(l => l.status === 'completed' && _inRange(l.wonAt || l.date, range));
+
+  const totalRevenue    = wonLeads.reduce((s, l) => s + _revenueValue(l), 0);
+  const platformCut     = totalRevenue * ((settings.commissionPct || 15) / 100);
+  const newLeadsCount   = periodLeads.length;
+  const completedCount  = wonLeads.length;
+
+  // Per-contractor breakdown (real only)
+  const realCtrs = _realContractors().filter(c => c.isActive !== false);
+  const ctrRows  = realCtrs.map(c => {
+    const cLeads = periodLeads.filter(l => l.contractorId === c.id);
+    const cWon   = wonLeads.filter(l => l.contractorId === c.id);
+    const cRev   = cWon.reduce((s, l) => s + _revenueValue(l), 0);
+    return { name: c.name, leads: cLeads.length, won: cWon.length, revenue: cRev };
+  }).filter(r => r.leads > 0 || r.won > 0);
+
+  const reportPayload = {
+    period,
+    periodLabel:      _periodLabel(period),
+    recipient,
+    adminEmail:       settings.adminEmail,
+    businessName:     settings.businessName || 'ExpertEV Installers',
+    resendApiKey:     apiKey,
+    stats: {
+      newLeads:     newLeadsCount,
+      completed:    completedCount,
+      revenue:      totalRevenue,
+      platformCut,
+      commissionPct: settings.commissionPct || 15,
+    },
+    contractors: ctrRows,
+  };
+
+  try {
+    const result = await sbSendMonthlyReport(reportPayload);
+    if (result.ok) {
+      if (statusEl) statusEl.textContent = `✅ Report sent to ${recipient}`;
+      showToast('Monthly report sent!', 'success');
+    } else {
+      const msg = result.error || 'Unknown error';
+      if (statusEl) statusEl.textContent = `❌ ${msg}`;
+      showToast(`Failed to send report: ${msg}`, 'error');
+    }
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `❌ ${err.message}`;
+    showToast(`Error: ${err.message}`, 'error');
+  }
 }
 
 // ─── CONTRACTOR PAGES ────────────────────────────────────────────
@@ -3159,7 +3685,16 @@ function upd(id, status) {
   if (l) {
     prevStatus = l.status;
     l.status = status;
-    if (status === 'contacted' && !l.contactedAt) l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    if (status === 'contacted' && !l.contactedAt) {
+      l.contactedAt = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    }
+    // ── Lock in revenue fields when job is won ──────────────────
+    // finalValue and wonAt are the revenue source of truth for all reporting.
+    // Set them atomically with the status change so they're never out of sync.
+    if (status === 'completed' && prevStatus !== 'completed') {
+      l.wonAt      = new Date().toISOString();
+      l.finalValue = l.quoteAmount != null ? Number(l.quoteAmount) : (l.value || 0);
+    }
     addNote(id, currentUser.name, `Status changed to ${cap(status)}.`);
     if (status === 'completed' && prevStatus !== 'completed') _onLeadCompleted(l);
   }
@@ -3170,7 +3705,9 @@ function upd(id, status) {
   refreshAdminDashboard();
   persist();
   if (isSupabaseReady()) {
-    sbUpdateLeadStatus(id, status).then(r => {
+    // Include won_at + final_value in the DB update when completing a lead
+    const wonExtra = (status === 'completed' && l) ? { won_at: l.wonAt, final_value: l.finalValue } : {};
+    sbUpdateLeadStatus(id, status, wonExtra).then(r => {
       if (!r) console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, status, result: 'failure', error: 'updateLeadStatus returned null — likely RLS policy' }));
     }).catch(e => console.error('[DB]', JSON.stringify({ step: 'lead_status_update', lead_id: id, error: e.message })));
 
@@ -3191,7 +3728,8 @@ function upd(id, status) {
 /* Fired once when any lead transitions into 'completed' status.
    Unconditional: always notifies. Review request prompt is separate. */
 function _onLeadCompleted(l) {
-  addNotification(`✅ <strong>Job Won — ${sanitizeHTML(l.name)}</strong> · $${l.value.toLocaleString()} · ${sanitizeHTML(l.county)}`);
+  const rv = l.finalValue ?? _revAmount(l);
+  addNotification(`✅ <strong>Job Won — ${sanitizeHTML(l.name)}</strong> · $${Number(rv).toLocaleString()} · ${sanitizeHTML(l.county)}`);
   if (settings.reviewRequests) {
     addNotification(`📩 <strong>Review request queued</strong> for ${sanitizeHTML(l.name)} — open lead to send`);
   }

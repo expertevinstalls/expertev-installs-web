@@ -1768,7 +1768,7 @@ function pgPipeline() {
         <div class="pipeline-col-header" style="border-top:2px solid ${colors[s]};padding-top:10px">${labels[s]}<span class="pipeline-count">${sl.length}</span></div>
         ${sl.length>0?`<div style="font-size:.72rem;color:var(--green);margin-bottom:10px">$${totalVal.toLocaleString()}</div>`:''}
         ${sl.length===0?`<div style="color:var(--gray);font-size:.78rem;text-align:center;padding:20px 0">No leads</div>`:''}
-        ${sl.map(l=>`<div class="pipeline-card" onclick="openLeadDetail('${l.id}')">
+        ${sl.map(l=>`<div class="pipeline-card" data-lead-id="${l.id}" onclick="openLeadDetail('${l.id}')">
           <div class="pipeline-card-name">${l.name}${l.priority==='high'?'<span style="color:var(--orange);margin-left:5px;font-size:.7rem">●</span>':''}</div>
           <div class="pipeline-card-detail">${l.complexity||l.service}</div>
           <div class="pipeline-card-detail" style="margin-top:3px">${_priceTag(l, true)}</div>
@@ -1828,6 +1828,7 @@ function renderLeadsTable() {
         <td style="display:flex;gap:4px">
           <button class="btn-icon" onclick="openLeadDetail('${l.id}')" title="Full Details">→</button>
           <button class="btn-icon" onclick="openQualityReview('${l.id}')" title="Quality Review" style="font-size:.8rem">🔍</button>
+          ${currentUser?.role==='admin'?`<button class="btn-icon" onclick="deleteLead('${l.id}')" title="Delete Lead" style="color:var(--red);font-size:.9rem">🗑</button>`:''}
         </td>
       </tr>`; }).join('')}
     </tbody></table>`;
@@ -3698,6 +3699,7 @@ function openLeadDetail(id) {
       <button class="btn btn-outline btn-sm" style="margin-bottom:4px" onclick="_saveInlineQuote('${l.id}')">💾 Save Quote Amount</button>` : ''}
     </div>`;
   document.getElementById('modal-footer').innerHTML = `
+    ${currentUser?.role==='admin'?`<button class="btn btn-outline" onclick="deleteLead('${l.id}')" style="color:var(--red);border-color:rgba(239,68,68,.4);margin-right:auto">🗑 Delete</button>`:''}
     <button class="btn btn-outline" onclick="closeModalDirect()">Close</button>
     <button class="btn btn-primary" onclick="saveModal('${l.id}')">Save Changes</button>`;
   document.getElementById('modal-overlay').classList.add('open');
@@ -3740,6 +3742,34 @@ function _actorInfo() {
     id:   currentUser.email || currentUser.id || '',
     name: currentUser.name  || currentUser.email || currentUser.id || '',
   };
+}
+
+/**
+ * Delete a lead. Admin-only.
+ * Removes from Supabase, in-memory state, and all visible UI surfaces.
+ */
+async function deleteLead(leadId) {
+  if (currentUser?.role !== 'admin') return;
+  if (!window.confirm('Delete this lead? This cannot be undone.')) return;
+  // Remove from Supabase
+  if (isSupabaseReady()) {
+    const ok = await sbDeleteLead(leadId);
+    if (!ok) { showToast('Delete failed — please try again'); return; }
+  }
+  // Remove from in-memory state
+  const idx = leads.findIndex(l => l.id === leadId);
+  if (idx !== -1) leads.splice(idx, 1);
+  persist();
+  // Close modal if it's showing this lead
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay?.classList.contains('open')) closeModalDirect();
+  // Refresh All Leads table if visible
+  if (document.getElementById('leads-table-wrap')) renderLeadsTable();
+  // Remove pipeline card if visible (both admin and any stale DOM)
+  document.querySelectorAll(`[data-lead-id="${leadId}"]`).forEach(el => el.remove());
+  // Update sidebar badge counts
+  buildSidebar();
+  showToast('Lead deleted');
 }
 
 /**

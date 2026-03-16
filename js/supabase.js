@@ -235,6 +235,20 @@ async function sbUpdateLead(id, fields) {
 }
 
 /**
+ * Hard-delete a lead by ID.
+ * Child records (notes, lead_activity, lead_assignment_history) cascade automatically.
+ * Returns true on success, false on error.
+ */
+async function sbDeleteLead(id) {
+  const db = _db();
+  if (!db) return false;
+  const { error } = await db.from('leads').delete().eq('id', id);
+  if (error) { console.error('[Supabase] deleteLead:', error.message); return false; }
+  console.log('[DB] Lead deleted ✓', id);
+  return true;
+}
+
+/**
  * Update a lead's status.
  * Automatically sets contacted_at when transitioning to 'contacted'.
  * extraFields: optional additional DB columns to write atomically (e.g. won_at, final_value).

@@ -348,9 +348,14 @@ function getJobIntelligence(l) {
   const distance     = l.distance     || 'notsure';
   const chargerBrand = l.chargerBrand || '';
   const service      = (l.service     || '').toLowerCase();
+  const homeType     = l.homeType     || '';
+  const openBreaker  = l.openBreaker  || '';
+  const panelLoc     = l.panelLocation || '';
 
-  const isCommercial = chargerBrand === 'commercial' || service.includes('commercial') || service.includes('fleet');
-  const is100amp     = panelSize === '100amp';
+  const isCommercial    = chargerBrand === 'commercial' || service.includes('commercial') || service.includes('fleet') || homeType === 'commercial';
+  const is100amp        = panelSize === '100amp';
+  // No open breaker space reported → panel upgrade likely even if 200amp
+  const noBreakerSpace  = openBreaker === 'no';
   const isFarRun     = distance === 'over50';
   const isMedRun     = distance === '25to50';
   const isCloseRun   = distance === 'under10' || distance === '10to25';
@@ -362,7 +367,7 @@ function getJobIntelligence(l) {
     valueMin = 5000; valueMax = 15000; valueMid = 8000;
     timeMin  = 6;    timeMax  = 12;
     difficulty = 'Complex';
-  } else if (is100amp) {
+  } else if (is100amp || noBreakerSpace) {
     complexity = 'Panel Upgrade Likely';
     valueMin = 2500; valueMax = 6000; valueMid = 3800;
     timeMin  = 4;    timeMax  = 8;
@@ -412,6 +417,14 @@ function getJobIntelligence(l) {
   };
   const dm = diffMeta[difficulty] || diffMeta.Medium;
 
+  // Advisory flags — shown in quote assistant and lead detail
+  const flags = [];
+  if (noBreakerSpace && !is100amp) flags.push('⚠ Panel may need upgrade — no open breaker space reported');
+  if (homeType === 'condo' || homeType === 'apartment') flags.push('⚠ Condo/apartment — confirm electrical access with HOA or building management');
+  if (panelLoc === 'outside') flags.push('ℹ Outdoor panel — weatherproof conduit/enclosure may be required');
+  if (isFarRun) flags.push('ℹ Long conduit run (50+ ft) — plan for additional materials and labor');
+  if (l.rebate) flags.push(`💵 Eligible rebate: ${l.rebate}`);
+
   return {
     complexity,
     valueMin, valueMax, valueMid,
@@ -419,6 +432,7 @@ function getJobIntelligence(l) {
     timeLabel:  `${timeMin}–${timeMax} hours`,
     difficulty, diffColor: dm.color, diffBg: dm.bg, diffIcon: dm.icon,
     profit, profitColor, profitBg,
+    flags,
   };
 }
 
@@ -452,7 +466,7 @@ function _getContractors() {
   return dbContractors;
 }
 
-/* ── Auto Territory Assignment (round-robin) ── */
+/* ── Auto Territory Assignment (performance-weighted round-robin) ── */
 function autoAssignByCounty(county, state) {
   if (!settings.autoAssign) return null;
   const eligible = _getContractors().filter(c =>
@@ -461,9 +475,11 @@ function autoAssignByCounty(county, state) {
     (c.contractorType || 'real') !== 'demo'
   );
   if (!eligible.length) return null;
+  // Sort by routing score so higher-performing contractors get priority
+  const scored = eligible.map(c => ({ c, score: _contractorRoutingScore(c) })).sort((a,b) => b.score - a.score);
   const key = county;
-  _rrIndex[key] = (_rrIndex[key] || 0) % eligible.length;
-  const assigned = eligible[_rrIndex[key]];
+  _rrIndex[key] = (_rrIndex[key] || 0) % scored.length;
+  const assigned = scored[_rrIndex[key]].c;
   _rrIndex[key]++;
   return assigned.id;
 }
@@ -597,6 +613,15 @@ function submitForm(fieldsId, successId) {
     contactedAt:     null,
     review:          null,
     isDuplicate:     false,
+    // Part A new fields
+    homeType:        sanitizeHTML(vals['home_type']      || ''),
+    panelLocation:   sanitizeHTML(vals['panel_location'] || ''),
+    openBreaker:     sanitizeHTML(vals['open_breaker']   || ''),
+    panelPhotoUrl:   null,  // set async after Supabase Storage upload
+    // Part B response timer
+    assignedAt:      assignedId ? new Date().toISOString() : null,
+    responseDeadline: assignedId ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null,
+    isOverdue:       false,
   };
 
   /* Enrich with job intelligence */
@@ -633,6 +658,22 @@ function submitForm(fieldsId, successId) {
   } else {
     console.warn('[SUPABASE] not ready — lead saved to localStorage only | lead_id:', newId,
       '| Supabase key/URL may be incorrect, or CDN failed to load');
+  }
+
+  /* Panel photo upload — non-blocking, fires after lead is already saved */
+  const _panelPhotoFile = f.querySelector('[name="panel_photo"]')?.files?.[0] || null;
+  if (_panelPhotoFile && _panelPhotoFile.size > 5 * 1024 * 1024) {
+    console.warn('[Storage] Panel photo exceeds 5 MB — skipping upload');
+  } else if (_panelPhotoFile && isSupabaseReady()) {
+    sbUploadPanelPhoto(newId, _panelPhotoFile).then(url => {
+      if (url) {
+        lead.panelPhotoUrl = url;
+        persist();
+        sbUpdateLead(newId, { panel_photo_url: url })
+          .catch(e => console.warn('[Storage] updateLead panel_photo_url:', e.message));
+        console.log('[Storage] Panel photo uploaded ✓', newId, url.slice(0, 60) + '…');
+      }
+    }).catch(e => console.warn('[Storage] panel photo upload error (non-blocking):', e.message));
   }
 
   /* Show success — lead is captured */
@@ -1479,6 +1520,7 @@ function navTo(id) {
   if (id === 'all-leads')   renderLeadsTable();
   if (id === 'assign')      renderAssignTable();
   if (id === 'my-leads')    renderMyLeads();
+  if (id === 'leaderboard') refreshLeaderboard();
   if (id === 'dashboard')   setTimeout(renderFollowUpAlerts, 50);
   document.getElementById('notif-panel').classList.remove('open');
   notifOpen = false;
@@ -1518,7 +1560,7 @@ function buildPages() {
   const c = document.getElementById('pages');
   let html = '';
   if (currentUser.role === 'admin') {
-    html += pgAdminDashboard() + pgPipeline() + pgAllLeads() + pgAssign() + pgContractors() + pgRevenue() + pgSmsTemplates() + pgSettings();
+    html += pgAdminDashboard() + pgPipeline() + pgAllLeads() + pgAssign() + pgContractors() + pgRevenue() + pgLeaderboard() + pgSmsTemplates() + pgSettings();
   } else {
     html += pgMyLeads() + pgMyPipeline() + pgMyRevenue() + pgSmsTemplates() + pgMyProfile();
   }
@@ -1814,22 +1856,35 @@ function renderAssignTable() {
     ? `<div class="card"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>All leads assigned!</h3><p>New leads appear here as they come in.</p></div></div>`
     : `<div class="card"><table class="leads-table"><thead><tr><th>Customer</th><th>County / State</th><th>Service</th><th>Value</th><th>Priority</th><th>Assign To</th><th></th></tr></thead><tbody>
       ${unassigned.map(l => {
-        // Split contractors: county-match first (if any), then all others.
-        // This gives a useful suggestion without hiding anyone.
-        const inCounty  = allContractors.filter(c => (c.counties||[]).includes(l.county));
+        // Score + sort county-eligible contractors; fall back to all others below
+        const inCounty  = allContractors.filter(c => (c.counties||[]).includes(l.county) && c.isActive !== false && (c.contractorType||'real') !== 'demo');
         const outCounty = allContractors.filter(c => !(c.counties||[]).includes(l.county));
-        const countyOpts = inCounty.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-        const otherOpts  = outCounty.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        // Sort in-county contractors by routing score (best first = default selection)
+        const scoredInCounty = inCounty.map(c => ({ c, score: _contractorRoutingScore(c) })).sort((a,b) => b.score - a.score);
+        const recommended = scoredInCounty[0]?.c || null;
+        const countyOpts = scoredInCounty.map(({ c, score }) => {
+          const active = leads.filter(l2 => l2.contractor === c.id && !['completed','lost'].includes(l2.status)).length;
+          const myAll  = leads.filter(l2 => l2.contractor === c.id);
+          const myDone = myAll.filter(l2 => l2.status === 'completed');
+          const cr     = myAll.length ? Math.round(myDone.length / myAll.length * 100) : 0;
+          const hint   = `Score:${score} · ${cr}% close · ${active} active`;
+          const label  = `${c.companyName||c.name}${c.id===recommended?.id?' ⭐':''} (${hint})`;
+          return `<option value="${c.id}" ${c.id===recommended?.id?'selected':''}>${label}</option>`;
+        }).join('');
+        const otherOpts  = outCounty.map(c => `<option value="${c.id}">${c.companyName||c.name}</option>`).join('');
         const opts = inCounty.length && outCounty.length
-          ? `<optgroup label="Covers ${l.county}">${countyOpts}</optgroup><optgroup label="All others">${otherOpts}</optgroup>`
+          ? `<optgroup label="⭐ Covers ${l.county} — Recommended">${countyOpts}</optgroup><optgroup label="All others">${otherOpts}</optgroup>`
           : (countyOpts || otherOpts);
+        const recNote = recommended
+          ? `<div style="font-size:.7rem;color:#a5b4fc;margin-top:3px">⭐ Recommended: ${sanitizeHTML(recommended.companyName||recommended.name)}</div>`
+          : '';
         return `<tr>
           <td><div class="lead-name">${l.name}</div><div class="lead-sub">${l.address}</div></td>
           <td>${l.county},${l.state}</td>
           <td style="font-size:.8rem">${l.service}</td>
           <td style="color:var(--green);font-weight:600">$${l.value.toLocaleString()}</td>
           <td><select class="filter-select" style="font-size:.75rem;padding:4px 8px" onchange="setLeadPriority('${l.id}',this.value)"><option value="normal" ${l.priority==='normal'?'selected':''}>Normal</option><option value="high" ${l.priority==='high'?'selected':''}>High</option></select></td>
-          <td><select class="filter-select" id="asel-${l.id}" style="width:190px"><option value="">Select contractor...</option>${opts}</select></td>
+          <td><select class="filter-select" id="asel-${l.id}" style="width:210px"><option value="">Select contractor...</option>${opts}</select>${recNote}</td>
           <td><button class="btn btn-primary btn-sm" onclick="assignLead('${l.id}')">Assign →</button></td>
         </tr>`;
       }).join('')}
@@ -1873,6 +1928,17 @@ async function assignLead(lid) {
     : 'Unassigned';
   lead.status = 'assigned';
   lead.contractor = sel.value;
+  // Track when the lead was assigned and when the response window closes (2-hour default)
+  lead.assignedAt       = new Date().toISOString();
+  lead.responseDeadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  lead.isOverdue        = false;
+  if (isSupabaseReady()) {
+    sbUpdateLead(lid, {
+      assigned_at:        lead.assignedAt,
+      response_deadline:  lead.responseDeadline,
+      is_overdue:         false,
+    }).catch(e => console.warn('[DB] assignLead assigned_at update:', e.message));
+  }
   addNote(lid, 'Admin', `Assigned to ${contractorName}.`);
   renderAssignTable(); buildSidebar();
   persist();
@@ -1884,6 +1950,126 @@ async function assignLead(lid) {
     sbLogActivity(lid, 'lead_assigned', _prevContractorForActivity, contractorName, _a.type, _a.id, _a.name)
       .catch(e => console.error('[DB] logActivity (assignLead):', e.message));
   }
+}
+
+// ─── LEADERBOARD ─────────────────────────────────────────────────────────────
+function pgLeaderboard() {
+  return `<div class="page" id="page-leaderboard">
+    <div class="page-header">
+      <div><h1>Contractor Leaderboard</h1><p>Performance rankings — real contractors only, demo excluded</p></div>
+      <div class="page-header-actions" id="leaderboard-period-wrap"></div>
+    </div>
+    <div id="leaderboard-wrap"></div>
+  </div>`;
+}
+
+function setLeaderPeriod(p) { _leaderPeriod = p; refreshLeaderboard(); }
+
+function refreshLeaderboard() {
+  const wrap    = document.getElementById('leaderboard-wrap');
+  const pwrap   = document.getElementById('leaderboard-period-wrap');
+  if (!wrap) return;
+
+  const picker = `<select class="form-input" style="width:auto;padding:6px 10px;font-size:.82rem;background:var(--navy-mid);color:var(--white);border:1px solid var(--navy-border);cursor:pointer" onchange="setLeaderPeriod(this.value)">
+    <option value="this-month" ${_leaderPeriod==='this-month'?'selected':''}>This Month</option>
+    <option value="last-month" ${_leaderPeriod==='last-month'?'selected':''}>Last Month</option>
+    <option value="90-days"    ${_leaderPeriod==='90-days'   ?'selected':''}>Last 90 Days</option>
+    <option value="all"        ${_leaderPeriod==='all'       ?'selected':''}>All Time</option>
+  </select>`;
+  if (pwrap) pwrap.innerHTML = picker;
+
+  const range    = _dateRange(_leaderPeriod);
+  const demoIds  = _demoContractorIds();
+  const realCtrs = _realContractors();
+
+  if (realCtrs.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-state-icon">🏆</div><h3>No contractors yet</h3><p>Add real contractors to see rankings.</p></div></div>`;
+    return;
+  }
+
+  // Compute stats per contractor for the period
+  const ranked = realCtrs.map(c => {
+    const cLeads  = leads.filter(l => l.contractor === c.id && _inRange(l.createdAt, range));
+    const cWon    = leads.filter(l => l.contractor === c.id && l.status === 'completed' && _inRange(l.wonAt || l.createdAt, range));
+    const allLeads = leads.filter(l => l.contractor === c.id); // all time for response speed
+    const revenue  = cWon.reduce((s,l) => s + _revenueValue(l), 0);
+    const closeRate = cLeads.length ? Math.round(cWon.length / cLeads.length * 100) : 0;
+    const avgVal    = cWon.length ? Math.round(revenue / cWon.length) : 0;
+    // Response speed: avg mins from assignedAt → contactedAt for leads that have both
+    const respTimes = allLeads.filter(l => l.assignedAt && l.contactedAt).map(l =>
+      (new Date(l.contactedAt) - new Date(l.assignedAt)) / 60000
+    );
+    const avgResp = respTimes.length ? Math.round(respTimes.reduce((s,v)=>s+v,0) / respTimes.length) : null;
+    // Ranking score: revenue 50% + close rate 30% + response speed 20%
+    const respScore = avgResp != null ? Math.max(0, 120 - avgResp) / 120 * 20 : 10; // baseline 10 if no data
+    const score = (revenue / 1000 * 0.5) + (closeRate * 0.3) + respScore;
+    return { c, leads: cLeads.length, won: cWon.length, revenue, closeRate, avgVal, avgResp, score };
+  }).sort((a,b) => b.score - a.score);
+
+  // Assign badges
+  const topCloser   = [...ranked].sort((a,b) => b.closeRate - a.closeRate)[0];
+  const topRevenue  = [...ranked].sort((a,b) => b.revenue - a.revenue)[0];
+  const fastResp    = [...ranked].filter(r => r.avgResp != null).sort((a,b) => a.avgResp - b.avgResp)[0];
+  const consistent  = ranked.find(r => r.leads >= 5 && r.won >= 2);
+
+  const badgeFor = (r) => {
+    const badges = [];
+    if (topCloser   && r.c.id === topCloser.c.id   && r.closeRate > 0)  badges.push(`<span style="background:rgba(74,222,128,0.12);color:#4ade80;border:1px solid rgba(74,222,128,0.3);border-radius:4px;font-size:.65rem;font-weight:700;padding:2px 7px;margin-left:4px">🏆 Top Closer</span>`);
+    if (topRevenue  && r.c.id === topRevenue.c.id   && r.revenue > 0)    badges.push(`<span style="background:rgba(34,211,238,0.1);color:#22d3ee;border:1px solid rgba(34,211,238,0.3);border-radius:4px;font-size:.65rem;font-weight:700;padding:2px 7px;margin-left:4px">💰 High Revenue</span>`);
+    if (fastResp    && r.c.id === fastResp.c.id     && r.avgResp != null) badges.push(`<span style="background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);border-radius:4px;font-size:.65rem;font-weight:700;padding:2px 7px;margin-left:4px">⚡ Fast Responder</span>`);
+    if (consistent  && r.c.id === consistent.c.id)                        badges.push(`<span style="background:rgba(167,139,250,0.1);color:#a78bfa;border:1px solid rgba(167,139,250,0.3);border-radius:4px;font-size:.65rem;font-weight:700;padding:2px 7px;margin-left:4px">📈 Consistent</span>`);
+    return badges.join('');
+  };
+
+  const rankIcon = (i) => ['🥇','🥈','🥉'][i] || `<span style="color:var(--gray);font-weight:700">#${i+1}</span>`;
+
+  wrap.innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span>🏆</span><div class="card-title">Rankings — ${_periodLabel(_leaderPeriod)}</div></div>
+      <div class="card-body" style="padding:0">
+        <table class="leads-table">
+          <thead><tr>
+            <th style="width:40px">Rank</th>
+            <th>Contractor</th>
+            <th>Leads</th>
+            <th>Won</th>
+            <th>Close Rate</th>
+            <th>Revenue</th>
+            <th>Avg Job</th>
+            <th>Avg Response</th>
+          </tr></thead>
+          <tbody>
+          ${ranked.map((r,i) => `<tr style="${i===0?'background:rgba(74,222,128,0.04)':''}">
+            <td style="text-align:center;font-size:1.1rem">${rankIcon(i)}</td>
+            <td>
+              <div style="font-weight:700;color:var(--white)">${sanitizeHTML(r.c.companyName||r.c.name)}</div>
+              <div style="font-size:.72rem;color:var(--gray)">${r.c.isActive===false?'<span style="color:#f87171">Inactive</span>':'Active'}${badgeFor(r)}</div>
+            </td>
+            <td style="text-align:center;color:var(--blue-bright);font-weight:600">${r.leads}</td>
+            <td style="text-align:center;color:var(--green);font-weight:600">${r.won}</td>
+            <td style="text-align:center">
+              <span style="font-weight:700;color:${r.closeRate>=50?'#4ade80':r.closeRate>=25?'#fbbf24':'#94a3b8'}">${r.closeRate}%</span>
+            </td>
+            <td style="color:var(--cyan);font-weight:700">$${r.revenue.toLocaleString()}</td>
+            <td style="color:var(--gray)">$${r.avgVal.toLocaleString()}</td>
+            <td style="color:var(--gray);font-size:.82rem">${r.avgResp != null ? (r.avgResp < 60 ? `${r.avgResp}m` : `${Math.floor(r.avgResp/60)}h ${r.avgResp%60}m`) : '—'}</td>
+          </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+      ${ranked.slice(0,3).map((r,i)=>`
+      <div class="card" style="border-top:3px solid ${['#ffd700','#c0c0c0','#cd7f32'][i]||'var(--navy-border)'}">
+        <div class="card-body" style="text-align:center;padding:20px">
+          <div style="font-size:1.6rem;margin-bottom:8px">${rankIcon(i)}</div>
+          <div style="font-weight:800;font-size:.95rem;color:var(--white);margin-bottom:4px">${sanitizeHTML(r.c.companyName||r.c.name)}</div>
+          <div style="font-size:.8rem;color:var(--green);font-weight:700">$${r.revenue.toLocaleString()}</div>
+          <div style="font-size:.72rem;color:var(--gray);margin-top:4px">${r.won} jobs · ${r.closeRate}% close</div>
+          <div style="margin-top:8px">${badgeFor(r)}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
 }
 
 // ─── CONTRACTORS ─────────────────────────────────────────────────────────────
@@ -2453,6 +2639,21 @@ function _inRange(isoStr, range) {
  */
 function _realContractors() {
   return dbContractors.filter(c => (c.contractorType || 'real') !== 'demo');
+}
+
+/**
+ * Returns a 0–100 routing score for a contractor.
+ * Higher = better candidate for a new lead assignment.
+ * Factors: close rate (60pts), workload balance (40pts).
+ */
+function _contractorRoutingScore(c) {
+  const myLeads    = leads.filter(l => l.contractor === c.id);
+  const done       = myLeads.filter(l => l.status === 'completed');
+  const closeRate  = myLeads.length ? done.length / myLeads.length : 0; // 0–1
+  const active     = myLeads.filter(l => !['completed','lost'].includes(l.status)).length;
+  const perfScore  = Math.round(closeRate * 60);                          // 0–60
+  const loadScore  = Math.max(0, Math.round((10 - Math.min(active, 10)) * 4)); // 0–40
+  return perfScore + loadScore;
 }
 
 /**
@@ -3090,11 +3291,26 @@ function renderMyLeads() {
   wrap.innerHTML = `<div class="intel-cards-grid">${myLeads.map(l => buildIntelCard(l)).join('')}</div>`;
 }
 
+/** Returns a formatted response timer badge or empty string. */
+function _responseTimerBadge(l) {
+  if (!l.assignedAt || ['contacted','scheduled','quote-sent','completed','lost'].includes(l.status)) return '';
+  const minsSince = Math.floor((Date.now() - new Date(l.assignedAt)) / 60000);
+  const isOverdue = minsSince >= 120; // 2-hour SLA
+  const label = minsSince < 60
+    ? `${minsSince}m ago`
+    : `${Math.floor(minsSince / 60)}h ${minsSince % 60}m ago`;
+  const color  = isOverdue ? '#f87171' : minsSince >= 90 ? '#fb923c' : '#94a3b8';
+  const bg     = isOverdue ? 'rgba(248,113,113,0.1)' : 'rgba(148,163,184,0.07)';
+  const border = isOverdue ? 'rgba(248,113,113,0.3)' : 'rgba(148,163,184,0.2)';
+  return `<span class="intel-badge" style="color:${color};background:${bg};border-color:${border};font-size:.68rem">⏱ ${label}${isOverdue ? ' — OVERDUE' : ''}</span>`;
+}
+
 function buildIntelCard(l) {
   const ji = getJobIntelligence(l);
   const distLabel = {under10:'Under 10 ft',  '10to25':'10–25 ft', '25to50':'25–50 ft', over50:'Over 50 ft', notsure:'Unknown'}[l.distance] || l.distance || '—';
   const panelLabel = {under10:'<10ft','10to25':'10–25ft','25to50':'25–50ft',over50:'>50ft',notsure:'?'}[l.distance]||'';
   const profitGrad = { High:'linear-gradient(90deg,#4ade80,#22c55e)', Medium:'linear-gradient(90deg,#fbbf24,#f59e0b)', Low:'linear-gradient(90deg,#94a3b8,#64748b)' }[ji.profit] || '';
+  const timerBadge = _responseTimerBadge(l);
   const actionBtns = `
     ${l.status==='assigned'?`<button class="btn btn-primary btn-sm" onclick="upd('${l.id}','contacted');renderMyLeads()">✓ Mark Contacted</button>`:''}
     ${l.status==='contacted'?`<button class="btn btn-outline btn-sm" onclick="upd('${l.id}','scheduled');renderMyLeads()">📅 Schedule Est.</button>`:''}
@@ -3113,6 +3329,7 @@ function buildIntelCard(l) {
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           <span class="badge badge-${l.status}">${cap(l.status)}</span>
           <span class="intel-badge" style="color:${ji.diffColor};background:${ji.diffBg};border-color:${ji.diffColor}40">${ji.diffIcon} ${ji.difficulty}</span>
+          ${timerBadge}
         </div>
       </div>
     </div>
@@ -3301,14 +3518,23 @@ function openLeadDetail(id) {
           <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#a5b4fc">⚡ Lead Summary</span>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:0">
-          ${[
-            ['Customer',      l.name],
-            ['Location',      `${l.county}, ${l.state}`],
-            ['Project Type',  l.service],
-            ['Panel Size',    l.panel || '—'],
-            ['Distance',      {under10:'Under 10 ft','10to25':'10–25 ft','25to50':'25–50 ft',over50:'Over 50 ft',notsure:'Unknown'}[l.distance]||l.distance||'—'],
-            ['Charger Brand', l.charger || '—'],
-          ].map(([lbl,val],i)=>`
+          ${(()=>{
+            const htLabel = {single_family:'Single Family',townhouse:'Townhouse',condo:'Condo',apartment:'Apartment',commercial:'Commercial',notsure:'?'}[l.homeType] || l.homeType || '—';
+            const plLabel = {garage:'Garage',basement:'Basement',outside:'Outside',utility_room:'Utility Room',notsure:'?'}[l.panelLocation] || l.panelLocation || '—';
+            const obLabel = {yes:'Yes ✓',no:'No ✗',notsure:'?'}[l.openBreaker] || l.openBreaker || '—';
+            const rows = [
+              ['Customer',      l.name],
+              ['Location',      `${l.county}, ${l.state}`],
+              ['Project Type',  l.service],
+              ['Panel Size',    l.panel || '—'],
+              ['Distance',      {under10:'Under 10 ft','10to25':'10–25 ft','25to50':'25–50 ft',over50:'Over 50 ft',notsure:'Unknown'}[l.distance]||l.distance||'—'],
+              ['Charger Brand', l.charger || '—'],
+              ['Home Type',     htLabel],
+              ['Panel Location',plLabel],
+              ['Open Breakers', obLabel],
+            ];
+            return rows;
+          })().map(([lbl,val],i)=>`
             <div style="padding:8px ${i%2===0?'16px 8px 0':'0 8px 0'};${i%2===0?'border-right:1px solid rgba(30,45,74,.6)':''}">
               <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gray);margin-bottom:2px">${lbl}</div>
               <div style="font-size:.85rem;font-weight:600;color:var(--white)">${val}</div>
@@ -3345,6 +3571,29 @@ function openLeadDetail(id) {
           <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:6px">Lead Source</div>
           <div style="font-size:1.05rem;font-weight:800;color:#fbbf24">${l.leadSource||'Direct'}</div>
         </div>
+      </div>` : ''}
+      ${_ji.flags && _ji.flags.length > 0 ? `
+      <div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:10px;padding:12px 16px;margin-bottom:12px">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#fbbf24;margin-bottom:8px">⚠ Advisory Flags</div>
+        ${_ji.flags.map(f=>`<div style="font-size:.82rem;color:var(--silver);padding:3px 0;line-height:1.5">${sanitizeHTML(f)}</div>`).join('')}
+      </div>` : ''}
+      ${l.assignedAt ? (()=>{
+        const minsSince = Math.floor((Date.now() - new Date(l.assignedAt)) / 60000);
+        const isOd = minsSince >= 120;
+        const ageLabel = minsSince < 60 ? `${minsSince} min ago` : `${Math.floor(minsSince/60)}h ${minsSince%60}m ago`;
+        const col = isOd ? '#f87171' : minsSince >= 90 ? '#fb923c' : '#94a3b8';
+        return `<div style="display:flex;align-items:center;gap:10px;background:rgba(148,163,184,0.05);border:1px solid rgba(148,163,184,0.15);border-radius:8px;padding:10px 14px;margin-bottom:12px">
+          <span style="font-size:.75rem;color:var(--gray)">⏱ Assigned</span>
+          <span style="font-size:.82rem;font-weight:600;color:${col}">${ageLabel}${isOd ? ' — OVERDUE' : ''}</span>
+          ${l.contactedAt ? '' : `<span style="font-size:.72rem;background:${isOd?'rgba(248,113,113,0.1)':'rgba(148,163,184,0.08)'};color:${col};border:1px solid ${isOd?'rgba(248,113,113,0.3)':'rgba(148,163,184,0.2)'};border-radius:4px;padding:2px 8px">Not contacted</span>`}
+        </div>`;
+      })() : ''}
+      ${l.panelPhotoUrl ? `
+      <div style="margin-bottom:12px">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:8px">📷 Panel Photo</div>
+        <a href="${sanitizeHTML(l.panelPhotoUrl)}" target="_blank" rel="noopener">
+          <img src="${sanitizeHTML(l.panelPhotoUrl)}" alt="Panel photo" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--navy-border);cursor:pointer">
+        </a>
       </div>` : ''}
     </div>
     <div class="tab-panel" id="tab-details">
@@ -3745,9 +3994,56 @@ function openQuoteModal(leadId) {
   const l = leads.find(x => x.id === leadId);
   if (!l) return;
   const existingAmount = l.quoteAmount ? l.quoteAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+  const _qji  = getJobIntelligence(l);
+  const _htMap = {single_family:'Single Family',townhouse:'Townhouse',condo:'Condo',apartment:'Apartment',commercial:'Commercial'};
+  const _qScope = (() => {
+    const items = [];
+    if (_qji.complexity === 'Panel Upgrade Likely') {
+      items.push('Panel upgrade (200A service upgrade recommended)');
+      items.push('New 50A dedicated circuit');
+    } else if (_qji.complexity === 'Long Wiring Run') {
+      items.push('Extended conduit run (50+ ft)');
+      items.push('Dedicated 50A circuit');
+    } else if (_qji.complexity === 'Commercial Install') {
+      items.push('Commercial-grade wiring and conduit');
+      items.push('Multiple EVSE circuits if needed');
+    } else {
+      items.push('Dedicated 50A/240V circuit');
+      items.push('Conduit and wiring to charger location');
+    }
+    items.push('Charger mounting and connection');
+    items.push('Circuit breaker installation');
+    if (l.rebate) items.push(`Rebate paperwork (${l.rebate})`);
+    if (l.county && ['Burlington','Camden','Gloucester'].some(c=>l.county.includes(c))) items.push('NJ permit coordination');
+    else items.push('PA permit coordination if required');
+    return items;
+  })();
+  const _qUpsells = (() => {
+    const up = [];
+    if (_qji.complexity !== 'Panel Upgrade Likely' && l.openBreaker === 'no') up.push('⚠ Panel may need sub-panel or upgrade — quote separately');
+    if (l.homeType === 'condo' || l.homeType === 'apartment') up.push('HOA approval or building permit may add lead time');
+    if (_qji.complexity === 'Basic Installation') up.push('Upsell opportunity: smart panel monitoring add-on');
+    return up;
+  })();
   openModalWith(
     `Quote Sent — ${sanitizeHTML(l.name)}`,
-    `<p style="color:var(--silver);font-size:.9rem;margin:0 0 18px">Enter the price you quoted this customer. Both values are saved — the original estimate stays for reference.</p>
+    `<div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#a5b4fc;margin-bottom:10px">💡 Advisory Guidance — not a required quote</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-size:.68rem;color:var(--gray);margin-bottom:3px">Suggested Range</div>
+          <div style="font-weight:700;color:#4ade80;font-size:.95rem">${_qji.valueLabel}</div>
+        </div>
+        <div>
+          <div style="font-size:.68rem;color:var(--gray);margin-bottom:3px">Complexity</div>
+          <div style="font-weight:700;color:${_qji.diffColor};font-size:.88rem">${_qji.diffIcon} ${_qji.complexity}</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--gray);margin-bottom:4px;font-weight:600">Typical scope to include:</div>
+      <div style="font-size:.8rem;color:var(--silver);line-height:1.6;margin-bottom:${_qUpsells.length?'8px':'0'}">${_qScope.map(s=>`• ${s}`).join('<br>')}</div>
+      ${_qUpsells.length ? `<div style="font-size:.78rem;color:#fbbf24;margin-top:4px;line-height:1.5">${_qUpsells.map(u=>`${u}`).join('<br>')}</div>` : ''}
+    </div>
+    <p style="color:var(--silver);font-size:.9rem;margin:0 0 18px">Enter the price you quoted this customer. Both values are saved — the original estimate stays for reference.</p>
     <div class="form-group" style="margin-bottom:14px">
       <label class="form-label">Est. Job Value (original)</label>
       <div style="font-size:1rem;font-weight:700;color:var(--green);padding:8px 0">$${(l.value||0).toLocaleString()}</div>

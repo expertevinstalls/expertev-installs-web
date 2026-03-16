@@ -17,4 +17,5 @@ let _authListenerRegistered = false; // prevents registering the auth listener m
 let _realtimeSubs = [];             // active Supabase Realtime unsubscribe functions
 let _dashPeriod          = 'this-month';  // current period for admin dashboard: 'this-month' | 'last-month' | '90-days' | 'all'
 let _revPeriod           = 'this-month';  // current period for revenue page: same options
+let _leaderPeriod        = 'this-month';  // current period for leaderboard page: same options
 let _inactiveLoginAttempt = false;        // set by _resolveAuthUser when is_active = false

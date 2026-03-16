@@ -21,7 +21,7 @@ const ADMIN_NAV = [
   { section:'Overview', items:[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'pipeline',icon:'📋',label:'Pipeline'}] },
   { section:'Leads',    items:[{id:'all-leads',icon:'⚡',label:'All Leads',badgeNew:true},{id:'assign',icon:'🔄',label:'Assign Leads',badgeNew:true}] },
   { section:'People',   items:[{id:'contractors',icon:'🔧',label:'Contractors'}] },
-  { section:'Business', items:[{id:'revenue',icon:'💰',label:'Revenue'},{id:'sms-templates',icon:'💬',label:'SMS Templates'}] },
+  { section:'Business', items:[{id:'revenue',icon:'💰',label:'Revenue'},{id:'leaderboard',icon:'🏆',label:'Leaderboard'},{id:'sms-templates',icon:'💬',label:'SMS Templates'}] },
   { section:'Setup',    items:[{id:'settings',icon:'⚙️',label:'Settings'}] },
 ];
 const CONTRACTOR_NAV = [
@@ -30,7 +30,7 @@ const CONTRACTOR_NAV = [
 ];
 
 /* ── Page title map ── */
-const PAGE_TITLES = { dashboard:'Dashboard Overview', pipeline:'Lead Pipeline', 'all-leads':'All Leads', assign:'Assign Leads', contractors:'Contractors', revenue:'Revenue & Billing', 'sms-templates':'SMS Scripts & Sales Tools', settings:'Settings & Security', 'my-leads':'My Leads', 'my-pipeline':'My Pipeline', 'my-revenue':'Performance Analytics', 'my-profile':'My Profile' };
+const PAGE_TITLES = { dashboard:'Dashboard Overview', pipeline:'Lead Pipeline', 'all-leads':'All Leads', assign:'Assign Leads', contractors:'Contractors', revenue:'Revenue & Billing', leaderboard:'Contractor Leaderboard', 'sms-templates':'SMS Scripts & Sales Tools', settings:'Settings & Security', 'my-leads':'My Leads', 'my-pipeline':'My Pipeline', 'my-revenue':'Performance Analytics', 'my-profile':'My Profile' };
 
 /* ── Dev mode flag ──────────────────────────────────────────────────────────
    Set to true  → local USERS fallback is active when Supabase auth fails.

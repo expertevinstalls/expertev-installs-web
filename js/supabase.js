@@ -620,6 +620,14 @@ function _leadToRow(lead) {
     final_value:      lead.finalValue       ?? null,
     won_at:           lead.wonAt            ?? null,
     created_display:  lead.created          ?? '',
+    // Part A / Part B fields (schema_v4_intelligence_routing.sql)
+    home_type:         lead.homeType        ?? null,
+    panel_location:    lead.panelLocation   ?? null,
+    open_breaker:      lead.openBreaker     ?? null,
+    panel_photo_url:   lead.panelPhotoUrl   ?? null,
+    assigned_at:       lead.assignedAt      ?? null,
+    response_deadline: lead.responseDeadline ?? null,
+    is_overdue:        lead.isOverdue       ?? false,
     // created_at intentionally omitted — DB sets it via DEFAULT NOW()
   };
 }
@@ -674,9 +682,17 @@ function _rowToLead(row, notes) {
       : null,
     quoteUpdatedBy:  row.quote_updated_by ?? '',
     callNotes:       row.call_notes       ?? '',
-    finalValue:      row.final_value      ?? null,  // locked-in revenue (set when won)
-    wonAt:           row.won_at           ?? null,  // ISO timestamp of win (for monthly revenue)
-    createdAt:       row.created_at       ?? null,  // ISO timestamp (for date filtering)
+    finalValue:       row.final_value       ?? null,  // locked-in revenue (set when won)
+    wonAt:            row.won_at           ?? null,  // ISO timestamp of win (for monthly revenue)
+    createdAt:        row.created_at       ?? null,  // ISO timestamp (for date filtering)
+    // Part A / Part B fields (schema_v4_intelligence_routing.sql)
+    homeType:         row.home_type        ?? '',
+    panelLocation:    row.panel_location   ?? '',
+    openBreaker:      row.open_breaker     ?? '',
+    panelPhotoUrl:    row.panel_photo_url  ?? null,
+    assignedAt:       row.assigned_at      ?? null,
+    responseDeadline: row.response_deadline ?? null,
+    isOverdue:        row.is_overdue       ?? false,
     created:         row.created_display  ||
       new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     notes: noteRows.map(n => ({
@@ -1012,7 +1028,35 @@ async function sbInviteContractor(contractorId, email, extraFields = {}) {
 }
 
 
-/* ── 11b. MONTHLY REPORT EMAIL ───────────────────────────── */
+/* ── 11b. PANEL PHOTO UPLOAD ─────────────────────────────── */
+
+/**
+ * Upload a panel/install-area photo to the `lead-uploads` Supabase Storage bucket.
+ * Returns a 1-year signed URL string, or null on failure.
+ * The bucket is private — access is via signed URLs only.
+ */
+async function sbUploadPanelPhoto(leadId, file) {
+  const db = _db();
+  if (!db || !file) return null;
+  try {
+    const ext  = (file.name || 'photo').split('.').pop().toLowerCase() || 'jpg';
+    const path = `${leadId}/${Date.now()}.${ext}`;
+    const { error: upErr } = await db.storage
+      .from('lead-uploads')
+      .upload(path, file, { upsert: true });
+    if (upErr) { console.error('[Storage] uploadPanelPhoto:', upErr.message); return null; }
+    const { data: signedData } = await db.storage
+      .from('lead-uploads')
+      .createSignedUrl(path, 365 * 24 * 3600); // 1 year
+    return signedData?.signedUrl ?? null;
+  } catch (err) {
+    console.error('[Storage] uploadPanelPhoto threw:', err.message);
+    return null;
+  }
+}
+
+
+/* ── 11c. MONTHLY REPORT EMAIL ───────────────────────────── */
 
 /**
  * Calls the `send-monthly-report` Supabase Edge Function.

@@ -148,6 +148,18 @@
             </select>
           </div>
           <div class="ff">
+            <label>Home Type</label>
+            <select name="home_type">
+              <option value="">What type of home?</option>
+              <option value="single_family">Single Family Home</option>
+              <option value="townhouse">Townhouse</option>
+              <option value="condo">Condo</option>
+              <option value="apartment">Apartment</option>
+              <option value="commercial">Commercial / Business</option>
+              <option value="notsure">Not Sure</option>
+            </select>
+          </div>
+          <div class="ff">
             <label>EV Vehicle</label>
             <select name="ev_vehicle">
               <option value="">Select your vehicle...</option>
@@ -206,8 +218,32 @@
               <option value="not_purchased">Not purchased yet</option>
             </select>
           </div>
-          <!-- Panel Photo field removed temporarily — file storage not yet implemented.
-               Will be restored in Phase 4 (Supabase Storage). -->
+          <div class="ff-row">
+            <div class="ff">
+              <label>Where Is Your Electrical Panel?</label>
+              <select name="panel_location">
+                <option value="">Panel location...</option>
+                <option value="garage">Garage</option>
+                <option value="basement">Basement</option>
+                <option value="outside">Outside / Utility Box</option>
+                <option value="utility_room">Utility Room</option>
+                <option value="notsure">Not Sure</option>
+              </select>
+            </div>
+            <div class="ff">
+              <label>Does your panel have open breaker spaces?</label>
+              <select name="open_breaker">
+                <option value="">Open breaker space?</option>
+                <option value="yes">Yes — I can see open slots</option>
+                <option value="no">No — panel looks full</option>
+                <option value="notsure">Not Sure</option>
+              </select>
+            </div>
+          </div>
+          <div class="ff">
+            <label>Upload Photo of Electrical Panel <span style="font-weight:400;opacity:.7">(Optional)</span></label>
+            <input type="file" name="panel_photo" accept="image/jpeg,image/png" style="color:var(--white);font-size:.85rem;padding:8px 0">
+          </div>
           <div class="ff"><label>Notes (optional)</label><textarea name="notes" placeholder="Any additional details or questions..."></textarea></div>
           <input type="hidden" name="lead_source" id="main-lead-source" value="Direct">
           <!-- Honeypot: hidden from humans, bots fill it automatically -->
@@ -236,7 +272,26 @@
         <div class="form-success" id="main-form-success">
           <div class="success-icon">⚡</div>
           <div class="success-h">You're All Set!</div>
-          <p class="success-p">A licensed electrician will call you within 2 hours to discuss your project. Or call us directly: <a href="tel:+12155550199" style="color:var(--orange);">(215) 555-0199</a></p>
+          <p class="success-p">A licensed electrician will review your setup and call you within 2 hours.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;text-align:left">
+            <div style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:8px;padding:12px 14px">
+              <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4ade80;margin-bottom:4px">Typical Install</div>
+              <div style="font-size:.9rem;font-weight:600;color:var(--white)">2–4 hours</div>
+            </div>
+            <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.2);border-radius:8px;padding:12px 14px">
+              <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#22d3ee;margin-bottom:4px">Typical Range</div>
+              <div style="font-size:.9rem;font-weight:600;color:var(--white)">$900 – $1,600</div>
+            </div>
+            <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:12px 14px">
+              <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a5b4fc;margin-bottom:4px">Permits</div>
+              <div style="font-size:.9rem;font-weight:600;color:var(--white)">We coordinate them</div>
+            </div>
+            <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px 14px">
+              <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fbbf24;margin-bottom:4px">Rebates</div>
+              <div style="font-size:.9rem;font-weight:600;color:var(--white)">Up to $250 may apply</div>
+            </div>
+          </div>
+          <p class="success-p" style="margin-top:8px">Or call us directly: <a href="tel:+12155550199" style="color:var(--orange);">(215) 555-0199</a></p>
         </div>
       </div>
     </div>

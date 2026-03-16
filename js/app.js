@@ -220,7 +220,7 @@ function buildCounty(c, id) {
               </select>
             </div>
             <div class="ff"><label>Notes</label><textarea name="notes" placeholder="Panel type, any concerns, questions..."></textarea></div>
-            <button class="form-submit-btn" onclick="submitForm('cpff-${id}','cpfs-${id}')">⚡ Get ${c.name} Quote</button>
+            <button type="button" class="form-submit-btn" onclick="submitForm('cpff-${id}','cpfs-${id}')">⚡ Get ${c.name} Quote</button>
             <div class="form-micro">
               <div class="form-micro-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Private</div>
               <div class="form-micro-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>2hr Reply</div>
@@ -424,7 +424,6 @@ function getJobIntelligence(l) {
   if (panelLoc === 'outside') flags.push('ℹ Outdoor panel — weatherproof conduit/enclosure may be required');
   if (isFarRun) flags.push('ℹ Long conduit run (50+ ft) — plan for additional materials and labor');
   if (l.rebate) flags.push(`💵 Eligible rebate: ${l.rebate}`);
-  if (l.panelPhotoUrl) flags.push('📷 Panel photo provided — review before quoting');
 
   return {
     complexity,
@@ -485,37 +484,40 @@ function autoAssignByCounty(county, state) {
   return assigned.id;
 }
 
+let _submitInProgress = false; // guard against double-fire (touch events, rapid clicks)
+
 async function submitForm(fieldsId, successId) {
   console.log('[FORM] submitForm called | fieldsId:', fieldsId, '| Supabase ready:', isSupabaseReady(), '| adminEmail:', settings.adminEmail);
+
+  /* ── 0. Double-fire guard ── */
+  if (_submitInProgress) { console.warn('[FORM] submitForm already in progress — ignoring duplicate call'); return; }
+  _submitInProgress = true;
+
+  try {
+    await _submitFormInner(fieldsId, successId);
+  } finally {
+    _submitInProgress = false;
+  }
+}
+
+async function _submitFormInner(fieldsId, successId) {
   const f = document.getElementById(fieldsId);
   const s = document.getElementById(successId);
   if (!f) { console.error('[FORM] form element not found for id:', fieldsId); return; }
 
   /* ── 1. HONEYPOT: bots fill hidden fields, humans don't ── */
-  const honeypot = f.querySelector('[name="website"]');
-  if (honeypot && honeypot.value.trim() !== '') return; // silent reject
+  const honeypot = f.querySelector('[name="_hp_evf2"]');
+  const honeypotVal = honeypot ? honeypot.value.trim() : '';
+  if (honeypotVal !== '') { console.warn('[FORM] Honeypot triggered — rejecting submission | value:', honeypotVal); return; }
 
   /* ── 2. Collect field values ── */
-  const inputs = f.querySelectorAll('input:not([name="website"]), select, textarea');
+  const inputs = f.querySelectorAll('input:not([name="_hp_evf2"]), select, textarea');
   const data   = new FormData();
   const vals   = {};
   inputs.forEach(el => {
     if (!el.name) return;
-    if (el.type === 'file') {
-      // Formspree free tier returns 422 for real file attachments sent via AJAX.
-      // Instead: if a file was selected, send its filename as a plain text field
-      // (shows up in Formspree email as "panel_photo_name: IMG_1234.jpg").
-      // Actual file storage will be handled via Supabase in a later phase.
-      if (el.files && el.files.length > 0) {
-        const fname = el.files[0].name;
-        data.append(el.name + '_name', fname); // text field, not a file — Formspree accepts this
-        vals[el.name] = fname;                 // store filename in lead for reference
-      }
-      // No file selected → skip entirely
-    } else {
-      data.append(el.name, el.value);
-      vals[el.name] = el.value;
-    }
+    data.append(el.name, el.value);
+    vals[el.name] = el.value;
   });
 
   /* ── 3. Required field validation ── */
@@ -552,6 +554,7 @@ async function submitForm(fieldsId, successId) {
 
   /* ── 6. Duplicate detection (same phone or email in last 10 min) ── */
   if (_isDuplicate(vals['phone'], vals['email'])) {
+    console.log('[FORM] Duplicate detected — showing success without re-inserting | phone:', vals['phone'], '| email:', vals['email']);
     f.style.display = 'none';
     if (s) s.classList.add('show'); // show success so UX is seamless
     return;
@@ -559,9 +562,12 @@ async function submitForm(fieldsId, successId) {
 
   /* ── 7. Client-side rate limit (max 3 per 10 min) ── */
   if (!_checkRateLimit()) {
+    console.warn('[FORM] Rate limit reached — rejecting submission');
     showToast('Too many submissions — please wait a few minutes or call us directly');
     return;
   }
+
+  console.log('[FORM] Validation passed — building lead object');
 
   /* ── 8. Disable button, show loading state ── */
   const btn = f.querySelector('.form-submit-btn') || f.parentElement.querySelector('.form-submit-btn');
@@ -618,7 +624,6 @@ async function submitForm(fieldsId, successId) {
     homeType:        sanitizeHTML(vals['home_type']      || ''),
     panelLocation:   sanitizeHTML(vals['panel_location'] || ''),
     openBreaker:     sanitizeHTML(vals['open_breaker']   || ''),
-    panelPhotoUrl:   null,  // set async after Supabase Storage upload
     // Part B response timer
     assignedAt:      assignedId ? new Date().toISOString() : null,
     responseDeadline: assignedId ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null,
@@ -631,22 +636,7 @@ async function submitForm(fieldsId, successId) {
   lead.profitPotential = ji.profit;
   lead.difficulty      = ji.difficulty;
 
-  /* Panel photo upload — BEFORE insert so URL is included in the initial DB row.
-     Awaited here; if upload fails the lead still saves without a photo. */
-  const _panelPhotoFile = f.querySelector('[name="panel_photo"]')?.files?.[0] || null;
-  if (_panelPhotoFile && _panelPhotoFile.size > 5 * 1024 * 1024) {
-    console.warn('[Storage] Panel photo exceeds 5 MB — skipping upload');
-  } else if (_panelPhotoFile && isSupabaseReady()) {
-    try {
-      const photoUrl = await sbUploadPanelPhoto(newId, _panelPhotoFile);
-      if (photoUrl) {
-        lead.panelPhotoUrl = photoUrl;
-        console.log('[Storage] Panel photo uploaded ✓ (pre-insert)', newId, photoUrl.slice(0, 60) + '…');
-      }
-    } catch (e) {
-      console.warn('[Storage] Panel photo upload error (non-blocking):', e.message);
-    }
-  }
+  console.log('[FORM] Lead object ready — saving to localStorage and Supabase');
 
   /* Save to localStorage first — lead is captured locally regardless of DB outcome */
   leads.unshift(lead);
@@ -659,8 +649,7 @@ async function submitForm(fieldsId, successId) {
   if (isSupabaseReady()) {
     console.log('[SUPABASE] Attempting lead insert | source:', _formSource, '| lead_id:', newId,
       '| status:', lead.status, '| contractor:', lead.contractor ?? 'null',
-      '| notes_count:', lead.notes.length,
-      '| panel_photo_url:', lead.panelPhotoUrl ? 'set' : 'none');
+      '| notes_count:', lead.notes.length);
     sbCreateLead(lead)
       .then(r => {
         if (!r) {
@@ -680,6 +669,7 @@ async function submitForm(fieldsId, successId) {
   }
 
   /* Show success — lead is captured */
+  console.log('[FORM] Showing success screen');
   f.style.display = 'none';
   if (s) s.classList.add('show');
 
@@ -3591,13 +3581,6 @@ function openLeadDetail(id) {
           ${l.contactedAt ? '' : `<span style="font-size:.72rem;background:${isOd?'rgba(248,113,113,0.1)':'rgba(148,163,184,0.08)'};color:${col};border:1px solid ${isOd?'rgba(248,113,113,0.3)':'rgba(148,163,184,0.2)'};border-radius:4px;padding:2px 8px">Not contacted</span>`}
         </div>`;
       })() : ''}
-      ${l.panelPhotoUrl ? `
-      <div style="margin-bottom:12px">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:8px">📷 Panel Photo</div>
-        <a href="${sanitizeHTML(l.panelPhotoUrl)}" target="_blank" rel="noopener">
-          <img src="${sanitizeHTML(l.panelPhotoUrl)}" alt="Panel photo" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--navy-border);cursor:pointer">
-        </a>
-      </div>` : ''}
     </div>
     <div class="tab-panel" id="tab-details">
       ${l.complexity ? `<div style="background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.3);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">

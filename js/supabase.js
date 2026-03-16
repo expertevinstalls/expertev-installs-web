@@ -624,7 +624,6 @@ function _leadToRow(lead) {
     home_type:         lead.homeType        ?? null,
     panel_location:    lead.panelLocation   ?? null,
     open_breaker:      lead.openBreaker     ?? null,
-    panel_photo_url:   lead.panelPhotoUrl   ?? null,
     assigned_at:       lead.assignedAt      ?? null,
     response_deadline: lead.responseDeadline ?? null,
     is_overdue:        lead.isOverdue       ?? false,
@@ -689,7 +688,6 @@ function _rowToLead(row, notes) {
     homeType:         row.home_type        ?? '',
     panelLocation:    row.panel_location   ?? '',
     openBreaker:      row.open_breaker     ?? '',
-    panelPhotoUrl:    row.panel_photo_url  ?? null,
     assignedAt:       row.assigned_at      ?? null,
     responseDeadline: row.response_deadline ?? null,
     isOverdue:        row.is_overdue       ?? false,
@@ -1024,34 +1022,6 @@ async function sbInviteContractor(contractorId, email, extraFields = {}) {
   } catch (err) {
     console.error('[Supabase] inviteContractor fetch error:', err.message);
     return { error: err.message };
-  }
-}
-
-
-/* ── 11b. PANEL PHOTO UPLOAD ─────────────────────────────── */
-
-/**
- * Upload a panel/install-area photo to the `lead-uploads` Supabase Storage bucket.
- * Returns a 1-year signed URL string, or null on failure.
- * The bucket is private — access is via signed URLs only.
- */
-async function sbUploadPanelPhoto(leadId, file) {
-  const db = _db();
-  if (!db || !file) return null;
-  try {
-    const ext  = (file.name || 'photo').split('.').pop().toLowerCase() || 'jpg';
-    const path = `${leadId}/${Date.now()}.${ext}`;
-    const { error: upErr } = await db.storage
-      .from('lead-uploads')
-      .upload(path, file, { upsert: true });
-    if (upErr) { console.error('[Storage] uploadPanelPhoto:', upErr.message); return null; }
-    const { data: signedData } = await db.storage
-      .from('lead-uploads')
-      .createSignedUrl(path, 365 * 24 * 3600); // 1 year
-    return signedData?.signedUrl ?? null;
-  } catch (err) {
-    console.error('[Storage] uploadPanelPhoto threw:', err.message);
-    return null;
   }
 }
 

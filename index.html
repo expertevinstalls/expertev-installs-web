@@ -240,15 +240,12 @@
               </select>
             </div>
           </div>
-          <div class="ff">
-            <label>Upload Photo of Electrical Panel <span style="font-weight:400;opacity:.7">(Optional)</span></label>
-            <input type="file" name="panel_photo" accept="image/jpeg,image/png" style="color:var(--white);font-size:.85rem;padding:8px 0">
-          </div>
           <div class="ff"><label>Notes (optional)</label><textarea name="notes" placeholder="Any additional details or questions..."></textarea></div>
           <input type="hidden" name="lead_source" id="main-lead-source" value="Direct">
-          <!-- Honeypot: hidden from humans, bots fill it automatically -->
-          <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none" aria-hidden="true">
-          <button class="form-submit-btn" onclick="submitForm('main-form-fields','main-form-success')">⚡ Get My Free Quote</button>
+          <!-- Honeypot: type="hidden" so browsers never autofill it (spec-guaranteed),
+               but bots that enumerate and fill all inputs including hidden ones get caught. -->
+          <input type="hidden" name="_hp_evf2" value="">
+          <button type="button" class="form-submit-btn" onclick="submitForm('main-form-fields','main-form-success')">⚡ Get My Free Quote</button>
           <div class="scarcity-bar">🗓️ Installation slots fill quickly — most jobs scheduled within 3–7 days.</div>
           <div class="phone-opt">
             <div class="phone-opt-text">Prefer to speak with an electrician directly?</div>

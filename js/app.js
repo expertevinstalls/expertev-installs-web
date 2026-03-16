@@ -424,6 +424,7 @@ function getJobIntelligence(l) {
   if (panelLoc === 'outside') flags.push('ℹ Outdoor panel — weatherproof conduit/enclosure may be required');
   if (isFarRun) flags.push('ℹ Long conduit run (50+ ft) — plan for additional materials and labor');
   if (l.rebate) flags.push(`💵 Eligible rebate: ${l.rebate}`);
+  if (l.panelPhotoUrl) flags.push('📷 Panel photo provided — review before quoting');
 
   return {
     complexity,
@@ -484,7 +485,7 @@ function autoAssignByCounty(county, state) {
   return assigned.id;
 }
 
-function submitForm(fieldsId, successId) {
+async function submitForm(fieldsId, successId) {
   console.log('[FORM] submitForm called | fieldsId:', fieldsId, '| Supabase ready:', isSupabaseReady(), '| adminEmail:', settings.adminEmail);
   const f = document.getElementById(fieldsId);
   const s = document.getElementById(successId);
@@ -630,6 +631,23 @@ function submitForm(fieldsId, successId) {
   lead.profitPotential = ji.profit;
   lead.difficulty      = ji.difficulty;
 
+  /* Panel photo upload — BEFORE insert so URL is included in the initial DB row.
+     Awaited here; if upload fails the lead still saves without a photo. */
+  const _panelPhotoFile = f.querySelector('[name="panel_photo"]')?.files?.[0] || null;
+  if (_panelPhotoFile && _panelPhotoFile.size > 5 * 1024 * 1024) {
+    console.warn('[Storage] Panel photo exceeds 5 MB — skipping upload');
+  } else if (_panelPhotoFile && isSupabaseReady()) {
+    try {
+      const photoUrl = await sbUploadPanelPhoto(newId, _panelPhotoFile);
+      if (photoUrl) {
+        lead.panelPhotoUrl = photoUrl;
+        console.log('[Storage] Panel photo uploaded ✓ (pre-insert)', newId, photoUrl.slice(0, 60) + '…');
+      }
+    } catch (e) {
+      console.warn('[Storage] Panel photo upload error (non-blocking):', e.message);
+    }
+  }
+
   /* Save to localStorage first — lead is captured locally regardless of DB outcome */
   leads.unshift(lead);
   persist();
@@ -641,7 +659,8 @@ function submitForm(fieldsId, successId) {
   if (isSupabaseReady()) {
     console.log('[SUPABASE] Attempting lead insert | source:', _formSource, '| lead_id:', newId,
       '| status:', lead.status, '| contractor:', lead.contractor ?? 'null',
-      '| notes_count:', lead.notes.length);
+      '| notes_count:', lead.notes.length,
+      '| panel_photo_url:', lead.panelPhotoUrl ? 'set' : 'none');
     sbCreateLead(lead)
       .then(r => {
         if (!r) {
@@ -658,22 +677,6 @@ function submitForm(fieldsId, successId) {
   } else {
     console.warn('[SUPABASE] not ready — lead saved to localStorage only | lead_id:', newId,
       '| Supabase key/URL may be incorrect, or CDN failed to load');
-  }
-
-  /* Panel photo upload — non-blocking, fires after lead is already saved */
-  const _panelPhotoFile = f.querySelector('[name="panel_photo"]')?.files?.[0] || null;
-  if (_panelPhotoFile && _panelPhotoFile.size > 5 * 1024 * 1024) {
-    console.warn('[Storage] Panel photo exceeds 5 MB — skipping upload');
-  } else if (_panelPhotoFile && isSupabaseReady()) {
-    sbUploadPanelPhoto(newId, _panelPhotoFile).then(url => {
-      if (url) {
-        lead.panelPhotoUrl = url;
-        persist();
-        sbUpdateLead(newId, { panel_photo_url: url })
-          .catch(e => console.warn('[Storage] updateLead panel_photo_url:', e.message));
-        console.log('[Storage] Panel photo uploaded ✓', newId, url.slice(0, 60) + '…');
-      }
-    }).catch(e => console.warn('[Storage] panel photo upload error (non-blocking):', e.message));
   }
 
   /* Show success — lead is captured */

@@ -322,7 +322,7 @@ function buildCounty(c, id) {
           <ul>
             <li><a href="tel:${WEBSITE_PHONE.tel}">PA: ${WEBSITE_PHONE.display}</a></li>
             <li><a href="tel:${WEBSITE_PHONE.tel}">NJ: ${WEBSITE_PHONE.display}</a></li>
-            <li><a href="mailto:info@expertevinstallers.com">Email Us</a></li>
+            <li><a href="mailto:expertevinstalls@gmail.com">expertevinstalls@gmail.com</a></li>
           </ul>
         </div>
       </div>

@@ -28,8 +28,9 @@ let notifications = [];
 let settings = {
   formspreeId: 'xykneqwo',
   adminEmail: 'expertevinstalls@gmail.com',
-  paPhone: '(215) 555-0199',
-  njPhone: '(856) 555-0199',
+  paPhone: '(267) 435-2592',
+  njPhone: '(267) 435-2592',
+  adminSmsPhone: '',
   leadFee: 75,
   commissionPct: 15,
   emailAlerts: true,

@@ -4,7 +4,7 @@
 const CD = {
   philadelphia: {
     name:"Philadelphia County", state:"PA", isNJ:false,
-    phone:"(215) 555-0199", tel:"+12155550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Philadelphia, PA",
     desc:`<strong>Licensed Philadelphia electricians</strong> installing Level 2 EV chargers across all 48 neighborhoods — from Center City to Northeast Philly, South Philly to Chestnut Hill. Every installation is permitted through Philadelphia L&I and warrantied for 1 year.`,
     checks:["PA-licensed electrician on every job","Philadelphia L&I permit filed and inspection passed","30% federal credit — we file for you","1-year workmanship warranty in writing","Same-week availability in most Philadelphia neighborhoods"],
@@ -17,7 +17,7 @@ const CD = {
   },
   montgomery: {
     name:"Montgomery County", state:"PA", isNJ:false,
-    phone:"(215) 555-0199", tel:"+12155550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Montgomery County, PA",
     desc:`Serving all of Montgomery County — <strong>King of Prussia, Norristown, Blue Bell, Lansdale, Horsham</strong>, and every township in between. Our electricians know Montgomery County's permit landscape across all 62 municipalities.`,
     checks:["PA-licensed electrician assigned to your township","MontCo township permit filed — all 62 municipalities","Free panel assessment before any work begins","Same-week scheduling for most MontCo areas"],
@@ -30,7 +30,7 @@ const CD = {
   },
   bucks: {
     name:"Bucks County", state:"PA", isNJ:false,
-    phone:"(215) 555-0199", tel:"+12155550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Bucks County, PA",
     desc:`Expert EV charger installation throughout Bucks County. From <strong>Doylestown and New Hope to Newtown and Bensalem</strong>, we serve every borough and township — including rural properties with detached garages requiring longer conduit runs.`,
     checks:["PA-licensed electrician serving all of Bucks County","Borough and township permits filed across Bucks County","30% federal credit identified and filed for you","Rural and detached garage installs welcome","1-year workmanship warranty, written before we start"],
@@ -43,7 +43,7 @@ const CD = {
   },
   chester: {
     name:"Chester County", state:"PA", isNJ:false,
-    phone:"(610) 555-0199", tel:"+16105550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Chester County, PA",
     desc:`Chester County homeowners — we specialize in both straightforward garage installs and complex projects requiring panel upgrades. <strong>West Chester, Malvern, Exton, and Phoenixville</strong> are among our most active areas.`,
     checks:["PA-licensed electrician for all Chester County townships","Township permits filed — from Tredyffrin to West Sadsbury","30% federal credit identified and filed for you","Free panel assessment — no surprise upgrade bills","Tesla Wall Connector and all brands installed"],
@@ -56,7 +56,7 @@ const CD = {
   },
   delaware: {
     name:"Delaware County", state:"PA", isNJ:false,
-    phone:"(610) 555-0199", tel:"+16105550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Delaware County, PA",
     desc:`Serving Delaware County from <strong>Media and Havertown to Upper Darby and Swarthmore</strong>. Delco's dense suburban landscape and older housing stock means many homes need panel evaluation before installation — our free assessment catches issues upfront.`,
     checks:["PA-licensed electrician with Delco permit experience","Delaware County's 49 municipalities — we know each one","30% federal credit identified and filed for you","Older home and small panel specialists","Free site assessment — no surprise panel upgrade bills"],
@@ -69,7 +69,7 @@ const CD = {
   },
   burlington: {
     name:"Burlington County", state:"NJ", isNJ:true,
-    phone:"(856) 555-0199", tel:"+18565550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Burlington County, NJ",
     desc:`Burlington County NJ homeowners — <strong>NJ-licensed electricians</strong> installing Level 2 EV chargers across Moorestown, Mt. Laurel, Marlton, and all surrounding towns. NJ permits, PSE&G rebates, and NJ Clean Energy credits handled for you.`,
     checks:["NJ-licensed master electrician on every job","All NJ electrical permits filed and inspection passed","PSE&G rebate + federal 30% credit + NJ tax exemption filed","Burlington County township approvals handled","1-year workmanship warranty — in writing"],
@@ -82,7 +82,7 @@ const CD = {
   },
   camden: {
     name:"Camden County", state:"NJ", isNJ:true,
-    phone:"(856) 555-0199", tel:"+18565550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Camden County, NJ",
     desc:`Expert EV charger installation across Camden County NJ — <strong>Cherry Hill, Voorhees, Haddonfield</strong>, and all surrounding towns. NJ-licensed electricians who pass inspections the first time and maximize your PSE&G rebates.`,
     checks:["NJ-licensed master electrician — verified and insured","NJ electrical permit and inspection handled completely","PSE&G rebate + federal 30% + NJ tax exemption filed","All EV brands and charger models installed","Same-week scheduling available in most Camden County towns"],
@@ -95,7 +95,7 @@ const CD = {
   },
   gloucester: {
     name:"Gloucester County", state:"NJ", isNJ:true,
-    phone:"(856) 555-0199", tel:"+18565550199",
+    phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Gloucester County, NJ",
     desc:`Serving Gloucester County NJ homeowners across <strong>Woodbury, Washington Township, Glassboro, and Sewell</strong>. Professional Level 2 EV charger installations with full NJ licensing, permits, and PSE&G rebate filing.`,
     checks:["NJ-licensed electrician for every Gloucester County install","All NJ permits filed and inspections passed","PSE&G rebate + federal 30% + NJ tax exemption handled","Washington Township and Monroe new construction specialists","1-year warranty on all labor"],
@@ -320,8 +320,8 @@ function buildCounty(c, id) {
         <div class="footer-col">
           <h5>Contact</h5>
           <ul>
-            <li><a href="tel:+12155550199">PA: (215) 555-0199</a></li>
-            <li><a href="tel:+18565550199">NJ: (856) 555-0199</a></li>
+            <li><a href="tel:${WEBSITE_PHONE.tel}">PA: ${WEBSITE_PHONE.display}</a></li>
+            <li><a href="tel:${WEBSITE_PHONE.tel}">NJ: ${WEBSITE_PHONE.display}</a></li>
             <li><a href="mailto:info@expertevinstallers.com">Email Us</a></li>
           </ul>
         </div>
@@ -660,6 +660,16 @@ async function _submitFormInner(fieldsId, successId) {
         } else {
           console.log('[LEADS] INSERT OK | source:', _formSource, '| lead_id:', newId,
             '| lead will appear in admin dashboard on next hydration or realtime event');
+          // ── EVENT 1: SMS to admin on new lead ────────────────────
+          if (settings.smsAlerts && settings.adminSmsPhone) {
+            const _smsContractor = assignedId ? _getContractors().find(c => c.id === assignedId) : null;
+            const _isDemo = _smsContractor && (_smsContractor.contractorType || 'real') === 'demo';
+            if (!_isDemo) {
+              sbSendSms(settings.adminSmsPhone,
+                `New lead: EV charger install in ${countyRaw} County, ${stateRaw}. Customer: ${fullName}. Check your dashboard.`
+              );
+            }
+          }
         }
       })
       .catch(e => console.error('[LEADS] INSERT THREW | source:', _formSource, '| lead_id:', newId, '| error:', e.message));
@@ -1939,6 +1949,15 @@ async function assignLead(lid) {
   showToast('Lead assigned to ' + contractorName);
   addNotification(`Lead assigned to <strong>${sanitizeHTML(contractorName)}</strong> — ${sanitizeHTML(lead.name)}`);
   _triggerAssignmentNotification(lead, sel.value);
+  // ── EVENT 2: SMS to contractor on assignment ──────────────────
+  if (settings.smsAlerts && contractor && contractor.phone && (contractor.contractorType || 'real') !== 'demo' && isSupabaseReady()) {
+    const _smsParts = [lead.service || 'EV charger install', `in ${lead.county} County`];
+    if (lead.panelSize && lead.panelSize !== 'notsure') _smsParts.push('Panel ' + lead.panelSize.replace('amp', 'A'));
+    if (lead.installLocation) _smsParts.push(lead.installLocation + ' install');
+    sbSendSms(contractor.phone,
+      `New lead assigned: ${_smsParts.join(', ')}. Check your dashboard.`
+    );
+  }
   if (isSupabaseReady()) {
     const _a = _actorInfo();
     sbLogActivity(lid, 'lead_assigned', _prevContractorForActivity, contractorName, _a.type, _a.id, _a.name)
@@ -3016,6 +3035,7 @@ function pgSettings() {
           <div class="form-group"><label class="form-label">Admin Email</label><input class="form-input" id="s-email" value="${settings.adminEmail}"></div>
           <div class="form-group"><label class="form-label">PA Phone Number</label><input class="form-input" id="s-paphone" value="${settings.paPhone}" placeholder="(215) 555-XXXX"><div style="font-size:.75rem;color:var(--gray);margin-top:4px">Shown on PA county pages of website</div></div>
           <div class="form-group"><label class="form-label">NJ Phone Number</label><input class="form-input" id="s-njphone" value="${settings.njPhone}" placeholder="(856) 555-XXXX"><div style="font-size:.75rem;color:var(--gray);margin-top:4px">Shown on NJ county pages of website</div></div>
+          <div class="form-group"><label class="form-label">Admin SMS Phone</label><input class="form-input" id="s-adminsmophone" value="${settings.adminSmsPhone||''}" placeholder="(215) 555-XXXX"><div style="font-size:.75rem;color:var(--gray);margin-top:4px">Your mobile number for SMS alerts (new leads, quotes, job won/lost). Must match a Twilio-verified number.</div></div>
         </div>
       </div>
     </div>
@@ -3065,7 +3085,7 @@ function pgSettings() {
           <div class="toggle ${settings.emailAlerts?'on':''}" id="toggle-email" onclick="toggleSetting('emailAlerts','toggle-email')"></div>
         </div>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-name">SMS alert on new lead</div><div class="setting-desc">Instant SMS to contractor within 5 seconds of lead assignment. Requires Twilio integration.</div></div>
+          <div class="setting-info"><div class="setting-name">SMS alerts (new leads, assignments, quotes, won/lost)</div><div class="setting-desc">Sends SMS to admin on new leads, quote submissions, and job won/lost. Sends SMS to contractor when a lead is assigned. Requires Twilio — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER in Supabase project secrets.</div></div>
           <div class="toggle ${settings.smsAlerts?'on':''}" id="toggle-sms" onclick="toggleSetting('smsAlerts','toggle-sms')"></div>
         </div>
         <div class="setting-row">
@@ -3138,9 +3158,10 @@ function toggleSetting(key, toggleId) {
   persist();
 }
 function saveSettings() {
-  settings.adminEmail  = document.getElementById('s-email')?.value      || settings.adminEmail;
-  settings.paPhone     = document.getElementById('s-paphone')?.value    || settings.paPhone;
-  settings.njPhone     = document.getElementById('s-njphone')?.value    || settings.njPhone;
+  settings.adminEmail    = document.getElementById('s-email')?.value        || settings.adminEmail;
+  settings.paPhone       = document.getElementById('s-paphone')?.value      || settings.paPhone;
+  settings.njPhone       = document.getElementById('s-njphone')?.value      || settings.njPhone;
+  settings.adminSmsPhone = (document.getElementById('s-adminsmophone')?.value ?? '').trim();
   settings.formspreeId   = document.getElementById('s-formspree')?.value  || settings.formspreeId;
   settings.googleMapsKey = (document.getElementById('s-gmap')?.value ?? '').trim();
   settings.commissionPct  = parseInt(document.getElementById('s-commission')?.value) || settings.commissionPct;
@@ -3987,6 +4008,21 @@ function upd(id, status) {
       sbLogActivity(id, _actType, _prevLabel, _newLabel, _a.type, _a.id, _a.name)
         .catch(e => console.error('[DB] logActivity (upd):', e.message));
     }
+    // ── EVENT 4: SMS to admin on Job Won / Job Lost ───────────
+    if (settings.smsAlerts && settings.adminSmsPhone && (status === 'completed' || status === 'lost') && l) {
+      const _wlContractor = l.contractor ? _getContractors().find(c => c.id === l.contractor) : null;
+      const _wlIsDemo = _wlContractor && (_wlContractor.contractorType || 'real') === 'demo';
+      if (!_wlIsDemo) {
+        let _wlMsg;
+        if (status === 'completed') {
+          const _wlVal = l.finalValue ? ` Final value $${Number(l.finalValue).toLocaleString('en-US')}.` : '';
+          _wlMsg = `Lead ${id} marked Job Won.${_wlVal}`;
+        } else {
+          _wlMsg = `Lead ${id} marked Job Lost.`;
+        }
+        sbSendSms(settings.adminSmsPhone, _wlMsg);
+      }
+    }
   }
   showToast('Status updated → ' + cap(status));
 }
@@ -4125,6 +4161,18 @@ function saveQuoteModal(leadId) {
     const _a = _actorInfo();
     sbLogActivity(leadId, _actType, _prevVal, _newVal, _a.type, _a.id, _a.name)
       .catch(e => console.error('[DB] logActivity (saveQuoteModal):', e.message));
+    // ── EVENT 3: SMS to admin on quote submitted ──────────────
+    if (settings.smsAlerts && settings.adminSmsPhone) {
+      const _qContractor = l.contractor ? _getContractors().find(c => c.id === l.contractor) : null;
+      const _qIsDemo = _qContractor && (_qContractor.contractorType || 'real') === 'demo';
+      if (!_qIsDemo) {
+        const _qAmt   = `$${rawAmt.toLocaleString('en-US')}`;
+        const _qCName = l.quoteUpdatedBy || (_qContractor?.name) || 'A contractor';
+        sbSendSms(settings.adminSmsPhone,
+          `Quote submitted: ${_qCName} quoted ${_qAmt} for lead ${leadId}.`
+        );
+      }
+    }
   }
 
   // ── Transition status ────────────────────────────────────────

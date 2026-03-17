@@ -5,8 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Expert EV Installers — Licensed EV Charger Installation PA & NJ</title>
 <meta name="description" content="Licensed EV charger installation across Philadelphia, Montgomery, Bucks, Chester & Delaware Counties PA and Burlington, Camden & Gloucester Counties NJ. Transparent pricing. Permits handled. Rebates maximized.">
+<!-- Preload LCP image (navbar logo) -->
+<link rel="preload" href="expertev-logo-opt.png" as="image" fetchpriority="high">
+<!-- Fonts: preconnect both origins, then load async to avoid render-blocking -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="assets/styles/main.css">
 <!-- ── CallRail DNI ────────────────────────────────────────────────────────────
      iOS Safari fix: script is injected conditionally so it can be disabled
@@ -21,11 +27,15 @@
      ──────────────────────────────────────────────────────────────────────────── -->
 <script>
   var ENABLE_CALLRAIL = true; // ← set to false to disable for testing
+  // Deferred until after page load — keeps CallRail out of the critical render path.
+  // DNI still activates before any real user interaction.
   if (ENABLE_CALLRAIL) {
-    var _cr = document.createElement('script');
-    _cr.type = 'text/javascript';
-    _cr.src = '//cdn.callrail.com/companies/466180933/6a881c7a18118d2598b7/12/swap.js';
-    document.head.appendChild(_cr);
+    window.addEventListener('load', function() {
+      var _cr = document.createElement('script');
+      _cr.type = 'text/javascript';
+      _cr.src = '//cdn.callrail.com/companies/466180933/6a881c7a18118d2598b7/12/swap.js';
+      document.head.appendChild(_cr);
+    });
   }
 </script>
 <script type="application/ld+json">
@@ -120,7 +130,7 @@
 <nav class="navbar" id="navbar">
   <div class="nav-wrap">
     <a class="nav-logo" onclick="goHome()">
-      <img src="expertev-logo (1).png" alt="Expert EV Installers">
+      <img src="expertev-logo-opt.png" alt="Expert EV Installers" width="84" height="42" fetchpriority="high">
     </a>
     <div class="nav-center">
       <a onclick="sid('services')">Services</a>
@@ -1104,7 +1114,7 @@
     <div class="wrap">
       <div class="footer-grid">
         <div>
-          <img src="expertev-logo (1).png" class="footer-logo-img" alt="Expert EV Installers">
+          <img src="expertev-logo-opt.png" class="footer-logo-img" alt="Expert EV Installers" width="88" height="44" loading="lazy">
           <div class="footer-brand">Expert<em>EV</em> Installers</div>
           <p class="footer-desc">Licensed EV charger installation coordination across Southeast PA and South Jersey. Every installation is completed by a licensed electrician within the Expert EV Installers contractor network. Every install permitted, insured, and warranted.</p>
           <div class="footer-lic">✓ PA Licensed · NJ Licensed · BBB Accredited</div>
@@ -1187,7 +1197,7 @@
   <div class="login-card" id="login-card">
     <button onclick="closeDashboardOverlay()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--gray);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px" title="Back to website">✕</button>
     <div class="login-logo">
-      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
+      <img src="expertev-logo-opt.png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3));" loading="lazy">
       <small style="display:block;font-family:'DM Sans',sans-serif;font-size:.72rem;color:var(--gray);letter-spacing:.05em;text-transform:uppercase;margin-top:4px">Dashboard Portal</small>
     </div>
     <h2 class="login-title">Welcome back</h2>
@@ -1204,7 +1214,7 @@
   <!-- ── Forgot-password panel ───────────────────────── -->
   <div id="forgot-password-panel" style="display:none;flex-direction:column;gap:16px;width:100%;max-width:360px">
     <div class="login-logo">
-      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
+      <img src="expertev-logo-opt.png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3));" loading="lazy">
     </div>
     <h2 class="login-title" style="margin:0">Reset Password</h2>
     <p class="login-sub" style="margin:0">Enter your email and we'll send a reset link.</p>
@@ -1219,7 +1229,7 @@
   <!-- ── Reset / Set-password panel (invite + recovery) ─ -->
   <div id="reset-password-panel" style="display:none;flex-direction:column;gap:16px;width:100%;max-width:360px">
     <div class="login-logo">
-      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3))">
+      <img src="expertev-logo-opt.png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3));" loading="lazy">
     </div>
     <h2 class="login-title" style="margin:0">Set Your Password</h2>
     <p class="login-sub" style="margin:0">Choose a secure password for your account.</p>
@@ -1252,7 +1262,7 @@ function hideForgotPassword() {
   <div id="dash-sidebar-backdrop" onclick="closeDashSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <img src="expertev-logo (1).png" alt="Expert EV Installers" style="height:36px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(25,184,240,0.25))">
+      <img src="expertev-logo-opt.png" alt="Expert EV Installers" style="height:36px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(25,184,240,0.25));" loading="lazy">
     </div>
     <div id="sidebar-nav"></div>
     <div class="sidebar-user">

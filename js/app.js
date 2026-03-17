@@ -4667,9 +4667,21 @@ function toggleFaq(btn) {
 ════════════════════════════════════════════════ */
 /* Portal opened via nav button */
 
+// Lazily inject dashboard.css the first time the portal is opened.
+// Kept out of main.css to eliminate ~35KB of unused CSS on the public homepage.
+function _loadDashboardCSS() {
+  if (document.getElementById('dashboard-css')) return; // already loaded
+  const link = document.createElement('link');
+  link.id   = 'dashboard-css';
+  link.rel  = 'stylesheet';
+  link.href = 'assets/styles/dashboard.css';
+  document.head.appendChild(link);
+}
+
 function openDashboard() {
   const overlay = document.getElementById('dash-overlay');
   if (!overlay) return;
+  _loadDashboardCSS();
   // Record that the user explicitly entered the portal so session restore
   // can auto-open it on refresh. Cleared in closeDashboardOverlay / doLogout.
   sessionStorage.setItem('ev_portal_open', '1');

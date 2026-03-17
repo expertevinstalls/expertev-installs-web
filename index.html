@@ -1347,6 +1347,7 @@ if (typeof _setupAuthStateChange === 'function') {
   sessionStorage.setItem('ev_portal_open', '1');
 
   // Show the panel immediately (synchronous — no waiting for async events).
+  if (typeof _loadDashboardCSS === 'function') _loadDashboardCSS();
   const overlay = document.getElementById('dash-overlay');
   if (overlay) { overlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
   const loginScreen = document.getElementById('login-screen');
@@ -1372,6 +1373,7 @@ if (typeof _setupAuthStateChange === 'function') {
     const session = await sbGetSession();
     if (!session?.user) return; // no saved session
     // Open the portal overlay before routing
+    if (typeof _loadDashboardCSS === 'function') _loadDashboardCSS();
     const overlay = document.getElementById('dash-overlay');
     if (overlay) { overlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
     await _resolveAuthUser(session.user);

@@ -144,7 +144,7 @@
       <a onclick="openDashboard()" class="nav-portal-btn" title="Contractor & Admin Login">Portal</a>
       <a class="pill-btn charge" onclick="focusForm()">Get Free Quote</a>
     </div>
-    <button class="hamburger" onclick="toggleMobile()"><span></span><span></span><span></span></button>
+    <button class="hamburger" onclick="toggleMobile()" aria-label="Open navigation menu"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
@@ -242,17 +242,17 @@
         </div>
         <div class="form-fields" id="main-form-fields">
           <div class="ff-row">
-            <div class="ff"><label>First Name</label><input type="text" name="first_name" placeholder="John"></div>
-            <div class="ff"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith"></div>
+            <div class="ff"><label for="main-first-name">First Name</label><input type="text" id="main-first-name" name="first_name" placeholder="John"></div>
+            <div class="ff"><label for="main-last-name">Last Name</label><input type="text" id="main-last-name" name="last_name" placeholder="Smith"></div>
           </div>
           <div class="ff-row">
-            <div class="ff"><label>Phone Number</label><input type="tel" name="phone" placeholder="(215) 555-0000" id="main-phone-input"></div>
-            <div class="ff"><label>Email</label><input type="email" name="email" placeholder="john@email.com"></div>
+            <div class="ff"><label for="main-phone-input">Phone Number</label><input type="tel" name="phone" placeholder="(215) 555-0000" id="main-phone-input"></div>
+            <div class="ff"><label for="main-email">Email</label><input type="email" id="main-email" name="email" placeholder="john@email.com"></div>
           </div>
           <div class="ff-row">
             <div class="ff">
-              <label>Your County</label>
-              <select name="county">
+              <label for="main-county">Your County</label>
+              <select id="main-county" name="county">
                 <option value="">Select your county...</option>
                 <option>Philadelphia County, PA</option>
                 <option>Montgomery County, PA</option>
@@ -265,8 +265,8 @@
               </select>
             </div>
             <div class="ff">
-              <label>Home Type</label>
-              <select name="home_type">
+              <label for="main-home-type">Home Type</label>
+              <select id="main-home-type" name="home_type">
                 <option value="">What type of home?</option>
                 <option value="single_family">Single Family Home</option>
                 <option value="townhouse">Townhouse</option>
@@ -278,8 +278,8 @@
             </div>
           </div>
           <div class="ff">
-            <label>EV Vehicle</label>
-            <select name="ev_vehicle">
+            <label for="main-ev-vehicle">EV Vehicle</label>
+            <select id="main-ev-vehicle" name="ev_vehicle">
               <option value="">Select your vehicle...</option>
               <option>Tesla (Model S / 3 / X / Y / Cybertruck)</option>
               <option>Ford F-150 Lightning / Mustang Mach-E</option>
@@ -293,7 +293,7 @@
           </div>
           <div class="ff-row">
             <div class="ff">
-              <label>Electrical Panel Size</label>
+              <label for="main-panel-size">Electrical Panel Size</label>
               <select name="panel_size" id="main-panel-size">
                 <option value="">Panel size...</option>
                 <option value="200amp">200 amp</option>
@@ -303,7 +303,7 @@
               </select>
             </div>
             <div class="ff">
-              <label>Distance From Panel</label>
+              <label for="main-distance">Distance From Panel</label>
               <select name="distance" id="main-distance">
                 <option value="">Distance...</option>
                 <option value="under10">Under 10 ft</option>
@@ -316,8 +316,8 @@
           </div>
           <div class="ff-row">
             <div class="ff">
-              <label>Installation Location</label>
-              <select name="install_location">
+              <label for="main-install-location">Installation Location</label>
+              <select id="main-install-location" name="install_location">
                 <option value="">Where will it be installed?</option>
                 <option value="garage">Garage</option>
                 <option value="outside_wall">Outside wall</option>
@@ -327,7 +327,7 @@
               </select>
             </div>
             <div class="ff">
-              <label>EV Charger Brand</label>
+              <label for="main-charger-brand">EV Charger Brand</label>
               <select name="charger_brand" id="main-charger-brand">
                 <option value="">Select charger brand...</option>
                 <option value="tesla">Tesla</option>
@@ -340,8 +340,8 @@
           </div>
           <div class="ff-row">
             <div class="ff">
-              <label>Where Is Your Electrical Panel?</label>
-              <select name="panel_location">
+              <label for="main-panel-location">Where Is Your Electrical Panel?</label>
+              <select id="main-panel-location" name="panel_location">
                 <option value="">Panel location...</option>
                 <option value="garage">Garage</option>
                 <option value="basement">Basement</option>
@@ -351,8 +351,8 @@
               </select>
             </div>
             <div class="ff">
-              <label>Does your panel have open breaker spaces?</label>
-              <select name="open_breaker">
+              <label for="main-open-breaker">Does your panel have open breaker spaces?</label>
+              <select id="main-open-breaker" name="open_breaker">
                 <option value="">Open breaker space?</option>
                 <option value="yes">Yes — I can see open slots</option>
                 <option value="no">No — panel looks full</option>
@@ -360,7 +360,7 @@
               </select>
             </div>
           </div>
-          <div class="ff"><label>Notes (optional)</label><textarea name="notes" placeholder="Any additional details or questions..."></textarea></div>
+          <div class="ff"><label for="main-notes">Notes (optional)</label><textarea id="main-notes" name="notes" placeholder="Any additional details or questions..."></textarea></div>
           <input type="hidden" name="lead_source" id="main-lead-source" value="Direct">
           <!-- Honeypot: type="hidden" so browsers never autofill it (spec-guaranteed),
                but bots that enumerate and fill all inputs including hidden ones get caught. -->
@@ -826,35 +826,35 @@
           <div class="rebate-row">
             <div class="rebate-amt" style="font-size:1rem;line-height:1.3">PA</div>
             <div>
-              <h4>Pennsylvania Homeowners (PECO Service Area)</h4>
+              <h3>Pennsylvania Homeowners (PECO Service Area)</h3>
               <p>There is currently no PECO residential EV charger installation rebate. PA homeowners may still qualify for the <strong>federal EV charger tax credit</strong> — see below. PECO does offer a separate $50 EV driver reporting credit for customers who notify PECO they purchased an EV.</p>
             </div>
           </div>
           <div class="rebate-row">
             <div class="rebate-amt">Up to<br><span style="font-size:1.5rem">$1,500</span></div>
             <div>
-              <h4>New Jersey Homeowners (PSE&amp;G Make-Ready)</h4>
+              <h3>New Jersey Homeowners (PSE&amp;G Make-Ready)</h3>
               <p>PSE&amp;G residential customers in Burlington, Camden, and Gloucester counties may qualify for a <strong>make-ready incentive of $50–$1,500 per charger</strong> toward wiring, permits, and panel upgrade costs. Eligibility and amount depend on the project scope. Note: PSE&amp;G's off-peak charging credit program is being phased out (no new applicants as of January 13, 2026) — this does not affect the make-ready incentive.</p>
             </div>
           </div>
           <div class="rebate-row">
             <div class="rebate-amt">30<span class="rebate-pct">%</span></div>
             <div>
-              <h4>Federal Tax Credit (PA &amp; NJ)</h4>
+              <h3>Federal Tax Credit (PA &amp; NJ)</h3>
               <p>The federal Alternative Fuel Vehicle Refueling Property Credit (IRS Form 8911) may cover up to <strong>30% of qualifying costs (up to $1,000)</strong> for eligible home charger installations placed in service by <strong>June 30, 2026</strong>. Eligibility depends on whether your property is in a qualifying census tract and your individual tax situation — confirm with a tax advisor. We provide itemized documentation to support your filing.</p>
             </div>
           </div>
           <div class="rebate-row">
             <div class="rebate-amt" style="font-size:1rem;line-height:1.3">Varies</div>
             <div>
-              <h4>Manufacturer Credits</h4>
+              <h3>Manufacturer Credits</h3>
               <p>We track active installation offers from Tesla, Ford, GM, and Rivian to ensure you aren't leaving money on the table at the time of purchase.</p>
             </div>
           </div>
           <div class="rebate-row">
             <div class="rebate-amt">0<span class="rebate-pct">%</span></div>
             <div>
-              <h4>NJ Sales Tax</h4>
+              <h3>NJ Sales Tax</h3>
               <p>As a licensed contractor, we ensure your installation qualifies as a "Capital Improvement," meaning you pay $0 in sales tax on the labor for your project.</p>
             </div>
           </div>
@@ -883,42 +883,42 @@
         <div class="expect-item">
           <div class="expect-num">01</div>
           <div class="expect-content">
-            <h4>On-time arrival with all materials</h4>
+            <h3>On-time arrival with all materials</h3>
             <p>Your electrician arrives within the scheduled window with all required tools, materials, and the charger (if we supplied it). No "I need to go get a part" situations.</p>
           </div>
         </div>
         <div class="expect-item">
           <div class="expect-num">02</div>
           <div class="expect-content">
-            <h4>Walk-through before any work starts</h4>
+            <h3>Walk-through before any work starts</h3>
             <p>They'll walk you through the plan — where wires run, where the charger mounts, and exactly what the permit covers. You sign off before a single screw is turned.</p>
           </div>
         </div>
         <div class="expect-item">
           <div class="expect-num">03</div>
           <div class="expect-content">
-            <h4>Clean, professional installation</h4>
+            <h3>Clean, professional installation</h3>
             <p>Wires are routed neatly — not draped across the wall. Conduit is straight. The charger is level. Your garage is cleaner when we leave than when we arrived.</p>
           </div>
         </div>
         <div class="expect-item">
           <div class="expect-num">04</div>
           <div class="expect-content">
-            <h4>Live demonstration before we leave</h4>
+            <h3>Live demonstration before we leave</h3>
             <p>Before we pack up, we plug in your EV, confirm the charger communicates with your car's app, and walk you through any settings. You leave knowing exactly how to use it.</p>
           </div>
         </div>
         <div class="expect-item">
           <div class="expect-num">05</div>
           <div class="expect-content">
-            <h4>Inspection is scheduled, not skipped</h4>
+            <h3>Inspection is scheduled, not skipped</h3>
             <p>We schedule the electrical inspection with your township before we leave. You don't have to chase anyone down. When it passes, we send you the paperwork.</p>
           </div>
         </div>
         <div class="expect-item">
           <div class="expect-num">06</div>
           <div class="expect-content">
-            <h4>Rebate guidance before we close</h4>
+            <h3>Rebate guidance before we close</h3>
             <p>Before we wrap up, we walk you through the utility and federal incentive programs you may qualify for, explain what documentation you'll need, and point you to how to apply. Rebate timelines vary by program.</p>
           </div>
         </div>
@@ -1195,7 +1195,7 @@
 
   <!-- ── Sign-in card ─────────────────────────────────── -->
   <div class="login-card" id="login-card">
-    <button onclick="closeDashboardOverlay()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--gray);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px" title="Back to website">✕</button>
+    <button onclick="closeDashboardOverlay()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--gray);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px" title="Back to website" aria-label="Back to website">✕</button>
     <div class="login-logo">
       <img src="expertev-logo-opt.png" alt="Expert EV Installers" style="height:48px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(25,184,240,0.3));" loading="lazy">
       <small style="display:block;font-family:'DM Sans',sans-serif;font-size:.72rem;color:var(--gray);letter-spacing:.05em;text-transform:uppercase;margin-top:4px">Dashboard Portal</small>
@@ -1203,8 +1203,8 @@
     <h2 class="login-title">Welcome back</h2>
     <p class="login-sub">Sign in to your account to continue</p>
     <div class="login-error" id="login-error" style="display:none"></div>
-    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="login-email" placeholder="your@email.com" autocomplete="email"></div>
-    <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-input" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="form-group"><label class="form-label" for="login-email">Email</label><input type="email" class="form-input" id="login-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div class="form-group"><label class="form-label" for="login-password">Password</label><input type="password" class="form-input" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In →</button>
     <div style="text-align:center;margin-top:14px">
       <button onclick="showForgotPassword()" style="background:none;border:none;color:var(--blue-bright);font-size:.82rem;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif">Forgot password?</button>
@@ -1218,7 +1218,7 @@
     </div>
     <h2 class="login-title" style="margin:0">Reset Password</h2>
     <p class="login-sub" style="margin:0">Enter your email and we'll send a reset link.</p>
-    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="forgot-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div class="form-group"><label class="form-label" for="forgot-email">Email</label><input type="email" class="form-input" id="forgot-email" placeholder="your@email.com" autocomplete="email"></div>
     <div id="forgot-msg" style="display:none;font-size:.82rem"></div>
     <button class="btn-login" onclick="doForgotPassword()">Send Reset Link →</button>
     <div style="text-align:center">
@@ -1233,8 +1233,8 @@
     </div>
     <h2 class="login-title" style="margin:0">Set Your Password</h2>
     <p class="login-sub" style="margin:0">Choose a secure password for your account.</p>
-    <div class="form-group"><label class="form-label">New Password</label><input type="password" class="form-input" id="rp-new" placeholder="Min 8 characters" autocomplete="new-password"></div>
-    <div class="form-group"><label class="form-label">Confirm Password</label><input type="password" class="form-input" id="rp-confirm" placeholder="Repeat new password" autocomplete="new-password"></div>
+    <div class="form-group"><label class="form-label" for="rp-new">New Password</label><input type="password" class="form-input" id="rp-new" placeholder="Min 8 characters" autocomplete="new-password"></div>
+    <div class="form-group"><label class="form-label" for="rp-confirm">Confirm Password</label><input type="password" class="form-input" id="rp-confirm" placeholder="Repeat new password" autocomplete="new-password"></div>
     <div id="rp-error" style="display:none;color:var(--red);font-size:.82rem"></div>
     <button class="btn-login" id="rp-btn" onclick="doResetPassword()">Set Password →</button>
   </div>
@@ -1271,7 +1271,7 @@ function hideForgotPassword() {
         <div class="user-name" id="user-name-display">Admin</div>
         <div class="user-role" id="user-role-display">Administrator</div>
       </div>
-      <button class="btn-logout" onclick="doLogout()" title="Sign out">⎋</button>
+      <button class="btn-logout" onclick="doLogout()" title="Sign out" aria-label="Sign out">⎋</button>
     </div>
   </aside>
 
@@ -1298,7 +1298,7 @@ function hideForgotPassword() {
   <div class="modal" id="modal">
     <div class="modal-header">
       <h2 class="modal-title" id="modal-title">Details</h2>
-      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+      <button class="modal-close" onclick="closeModalDirect()" aria-label="Close">✕</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer" id="modal-footer"></div>

@@ -230,7 +230,7 @@ function buildCounty(c, id) {
           <div class="form-success" id="cpfs-${id}">
             <div class="success-icon">⚡</div>
             <div class="success-h">Request Sent!</div>
-            <p class="success-p">A ${c.name} electrician calls within 2 hours.<br><a href="tel:${c.tel}" style="color:var(--orange);" data-no-call-intercept="true">${c.phone}</a></p>
+            <p class="success-p">A ${c.name} electrician calls within 2 hours during business hours.<br><a href="tel:${c.tel}" style="color:var(--orange);" data-no-call-intercept="true">${c.phone}</a></p>
           </div>
         </div>
       </div>
@@ -278,7 +278,7 @@ function buildCounty(c, id) {
       <div class="final-cta-inner">
         <div class="section-eyebrow" style="justify-content:center;margin-bottom:16px;">${c.name} · ${c.state}</div>
         <h2 class="cta-h">Ready to Charge<br><span>in ${c.name.split(' ')[0]}?</span></h2>
-        <p class="cta-p">Call our ${c.name} team or submit the form above. Licensed electrician calls within 2 hours. Same-week installs available.</p>
+        <p class="cta-p">Call our ${c.name} team or submit the form above. Licensed electrician calls within 2 hours during business hours. Same-week installs available.</p>
         <a href="tel:${c.tel}" class="cta-phone-big" data-no-call-intercept="true">⚡ ${c.phone}</a>
         <div class="cta-btns">
           <a class="pill-btn charge xl" onclick="window.scrollTo({top:0,behavior:'smooth'})">Get My Free Quote</a>

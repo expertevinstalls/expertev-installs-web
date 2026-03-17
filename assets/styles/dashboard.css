@@ -181,6 +181,13 @@
 .filter-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
 .filter-select{background:var(--navy-light);border:1px solid var(--navy-border);border-radius:9px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:.85rem;padding:8px 14px;outline:none;cursor:pointer}
 .filter-select:focus{border-color:var(--blue-bright)}
+/* BULK SELECTION */
+.bulk-action-bar{align-items:center;gap:10px;flex-wrap:wrap;background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.35);border-radius:10px;padding:10px 14px;margin-bottom:12px}
+.bulk-count{font-size:.85rem;font-weight:600;color:var(--white-d);white-space:nowrap;margin-right:4px}
+.bulk-assign-sel{min-width:200px}
+.bulk-delete-btn{background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3)}
+.bulk-delete-btn:hover{background:rgba(239,68,68,0.25)}
+.row-selected td{background:rgba(37,99,235,0.07)}
 /* CONTRACTOR */
 .contractor-card{background:var(--navy-mid);border:1px solid var(--navy-border);border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:16px;transition:border-color .2s}
 .contractor-card:hover{border-color:rgba(59,130,246,0.25)}

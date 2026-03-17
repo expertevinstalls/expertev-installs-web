@@ -1831,6 +1831,7 @@ function pgAllLeads() {
       <select class="filter-select" id="filter-county" onchange="renderLeadsTable()"><option value="">All Counties</option><option>Philadelphia</option><option>Montgomery</option><option>Bucks</option><option>Chester</option><option>Delaware</option><option>Burlington</option><option>Camden</option><option>Gloucester</option></select>
       <select class="filter-select" id="filter-priority" onchange="renderLeadsTable()"><option value="">All Priority</option><option value="high">High Priority</option><option value="normal">Normal</option></select>
     </div>
+    <div id="bulk-action-bar" class="bulk-action-bar" style="display:none"></div>
     <div class="card"><div id="leads-table-wrap"></div></div>
   </div>`;
 }
@@ -1849,10 +1850,15 @@ function renderLeadsTable() {
   const cName = id => id ? (_getContractors().find(c => c.id === id) || {}).name || '—' : '—';
   const wrap = document.getElementById('leads-table-wrap');
   if (!wrap) return;
-  wrap.innerHTML = filtered.length === 0
-    ? `<div class="empty-state"><div class="empty-state-icon">🔍</div><h3>No leads found</h3><p>Try adjusting the filters</p></div>`
-    : `<table class="leads-table"><thead><tr><th>ID</th><th>Customer</th><th>County</th><th>Description</th><th>Complexity</th><th>Value</th><th>Contractor</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
-      ${filtered.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr>
+  if (filtered.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><h3>No leads found</h3><p>Try adjusting the filters</p></div>`;
+  } else {
+    wrap.innerHTML = `<table class="leads-table"><thead><tr>
+        <th style="width:32px;padding:8px 4px 8px 12px"><input type="checkbox" id="select-all-cb" onchange="_onSelectAll(this.checked)" style="cursor:pointer;accent-color:#2563eb" title="Select all visible"></th>
+        <th>ID</th><th>Customer</th><th>County</th><th>Description</th><th>Complexity</th><th>Value</th><th>Contractor</th><th>Status</th><th>Date</th><th></th>
+      </tr></thead><tbody>
+      ${filtered.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr class="${selectedLeadIds.has(l.id)?'row-selected':''}">
+        <td style="padding:8px 4px 8px 12px"><input type="checkbox" class="lead-cb" data-id="${l.id}" onchange="_onLeadCbChange('${l.id}',this.checked)" ${selectedLeadIds.has(l.id)?'checked':''} style="cursor:pointer;accent-color:#2563eb"></td>
         <td><span class="mono" style="color:var(--gray);font-size:.78rem">${l.id}</span></td>
         <td><div class="lead-name">${l.name}${l.priority==='high'?'<span class="warn-tag" style="margin-left:6px;font-size:.68rem">HIGH</span>':''}</div><div class="lead-sub">${l.phone}</div></td>
         <td>${l.county},${l.state}</td>
@@ -1869,6 +1875,164 @@ function renderLeadsTable() {
         </td>
       </tr>`; }).join('')}
     </tbody></table>`;
+  }
+  _syncMasterCheckbox();
+  _syncBulkBar();
+}
+
+// ─── BULK SELECTION ─────────────────────────────────────────────
+
+/** Toggle one lead in/out of the selection set and sync UI. */
+function _onLeadCbChange(id, checked) {
+  if (checked) selectedLeadIds.add(id);
+  else         selectedLeadIds.delete(id);
+  _syncMasterCheckbox();
+  _syncBulkBar();
+}
+
+/** Select-all / deselect-all for visible rows. */
+function _onSelectAll(checked) {
+  document.querySelectorAll('.lead-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) selectedLeadIds.add(cb.dataset.id);
+    else         selectedLeadIds.delete(cb.dataset.id);
+    // Highlight row
+    const row = cb.closest('tr');
+    if (row) row.classList.toggle('row-selected', checked);
+  });
+  _syncBulkBar();
+}
+
+/** Sync master checkbox checked / indeterminate state. */
+function _syncMasterCheckbox() {
+  const cbs = [...document.querySelectorAll('.lead-cb')];
+  const all = document.getElementById('select-all-cb');
+  if (!all || cbs.length === 0) return;
+  const checkedCount = cbs.filter(cb => cb.checked).length;
+  all.checked       = checkedCount === cbs.length;
+  all.indeterminate = checkedCount > 0 && checkedCount < cbs.length;
+}
+
+/** Show/rebuild the bulk action bar based on current selection. */
+function _syncBulkBar() {
+  const bar = document.getElementById('bulk-action-bar');
+  if (!bar) return;
+  const count = selectedLeadIds.size;
+  if (count === 0) { bar.style.display = 'none'; return; }
+
+  const contractors = _getContractors().filter(c => c.isActive !== false && (c.contractorType||'real') !== 'demo');
+  const hasCtrs = contractors.length > 0;
+  const cOpts = hasCtrs
+    ? contractors.map(c => `<option value="${c.id}">${sanitizeHTML(c.companyName||c.name)}</option>`).join('')
+    : `<option value="" disabled>No contractors available</option>`;
+
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <span class="bulk-count">${count} lead${count!==1?'s':''} selected</span>
+    <select id="bulk-assign-sel" class="filter-select bulk-assign-sel">
+      <option value="">Assign to contractor…</option>
+      ${cOpts}
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="bulkAssign()" ${hasCtrs?'':'disabled title="No contractors available"'}>Assign Selected</button>
+    <button class="btn btn-sm bulk-delete-btn" onclick="bulkDelete()">🗑 Delete Selected</button>
+    <button class="btn btn-outline btn-sm" onclick="_clearSelection()">✕ Clear</button>`;
+}
+
+/** Clear selection, reset checkboxes and bar. */
+function _clearSelection() {
+  selectedLeadIds.clear();
+  document.querySelectorAll('.lead-cb').forEach(cb => {
+    cb.checked = false;
+    const row = cb.closest('tr');
+    if (row) row.classList.remove('row-selected');
+  });
+  const all = document.getElementById('select-all-cb');
+  if (all) { all.checked = false; all.indeterminate = false; }
+  _syncBulkBar();
+}
+
+/** Assign all selected leads to the chosen contractor. */
+async function bulkAssign() {
+  const sel = document.getElementById('bulk-assign-sel');
+  if (!sel || !sel.value) { showToast('Select a contractor first'); return; }
+  const ids = [...selectedLeadIds];
+  if (ids.length === 0) return;
+
+  const contractor = _getContractors().find(c => c.id === sel.value) || {};
+  const contractorName = contractor.companyName || contractor.name || sel.value;
+
+  const assignBtn = document.querySelector('#bulk-action-bar .btn-primary');
+  if (assignBtn) { assignBtn.disabled = true; assignBtn.textContent = 'Assigning…'; }
+
+  let success = 0, fail = 0;
+  for (const lid of ids) {
+    const lead = leads.find(l => l.id === lid);
+    if (!lead) { fail++; continue; }
+
+    if (isSupabaseReady()) {
+      let dbResult = null;
+      try { dbResult = await sbAssignLead(lid, sel.value); } catch(e) { console.error('[BulkAssign]', e.message); }
+      if (!dbResult) { fail++; continue; }
+    }
+
+    lead.status           = 'assigned';
+    lead.contractor       = sel.value;
+    lead.assignedAt       = new Date().toISOString();
+    lead.responseDeadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    lead.isOverdue        = false;
+    if (isSupabaseReady()) {
+      sbUpdateLead(lid, { assigned_at: lead.assignedAt, response_deadline: lead.responseDeadline, is_overdue: false })
+        .catch(e => console.warn('[DB] bulkAssign timestamp update:', e.message));
+    }
+    addNote(lid, 'Admin', `Assigned to ${contractorName} (bulk).`);
+    success++;
+  }
+
+  persist();
+  _clearSelection();
+  renderLeadsTable();
+  buildSidebar();
+
+  if (fail === 0) {
+    showToast(`✓ ${success} lead${success!==1?'s':''} assigned to ${sanitizeHTML(contractorName)}`);
+  } else {
+    showToast(`⚠ ${success} assigned, ${fail} failed — check console`);
+  }
+}
+
+/** Delete all selected leads after confirmation. */
+async function bulkDelete() {
+  const ids = [...selectedLeadIds];
+  if (ids.length === 0) return;
+
+  if (!window.confirm(`Delete ${ids.length} lead${ids.length!==1?'s':''}? This cannot be undone.`)) return;
+
+  let success = 0, fail = 0;
+  for (const lid of ids) {
+    if (isSupabaseReady()) {
+      let ok = false;
+      try { ok = await sbDeleteLead(lid); } catch(e) { console.error('[BulkDelete]', e.message); }
+      if (!ok) { fail++; continue; }
+    }
+    const idx = leads.findIndex(l => l.id === lid);
+    if (idx !== -1) leads.splice(idx, 1);
+    document.querySelectorAll(`[data-lead-id="${lid}"]`).forEach(el => el.remove());
+    success++;
+  }
+
+  persist();
+  _clearSelection();
+  // Close lead detail modal if it was showing a deleted lead
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay?.classList.contains('open')) closeModalDirect();
+  renderLeadsTable();
+  buildSidebar();
+
+  if (fail === 0) {
+    showToast(`🗑 ${success} lead${success!==1?'s':''} deleted`);
+  } else {
+    showToast(`⚠ ${success} deleted, ${fail} failed — check console`);
+  }
 }
 
 // ─── ASSIGN PAGE ────────────────────────────────────────────────

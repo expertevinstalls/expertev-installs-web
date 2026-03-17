@@ -25,6 +25,9 @@ let leads = [];
 // Demo notifications removed — real notifications are generated from DB events.
 let notifications = [];
 
+// Bulk selection — set of lead IDs currently selected in the All Leads table
+let selectedLeadIds = new Set();
+
 let settings = {
   formspreeId: 'xykneqwo',
   adminEmail: 'expertevinstalls@gmail.com',

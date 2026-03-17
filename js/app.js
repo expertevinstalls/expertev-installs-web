@@ -240,7 +240,7 @@ function buildCounty(c, id) {
         <div class="cp-trust-item"><div class="cp-trust-icon">🏅</div><h4>${c.state} Licensed</h4><p>Verified license in ${c.isNJ ? 'New Jersey' : 'Pennsylvania'} — every electrician we send.</p></div>
         <div class="cp-trust-item"><div class="cp-trust-icon">🔒</div><h4>$2M Insured</h4><p>Full general liability + workers comp. Your home is protected.</p></div>
         <div class="cp-trust-item"><div class="cp-trust-icon">📋</div><h4>Permits Handled</h4><p>${c.permit.split('.')[0]}.</p></div>
-        <div class="cp-trust-item"><div class="cp-trust-icon">💰</div><h4>${c.rebate} Rebate</h4><p>${c.rebateDesc.split('.')[0]}.</p></div>
+        <div class="cp-trust-item"><div class="cp-trust-icon">💰</div><h4>${c.isNJ ? 'PSE&G Make-Ready' : 'Federal Tax Credit'}</h4><p>${c.rebateDesc.split('.')[0]}.</p></div>
       </div>
     </div>
   </section>
@@ -248,8 +248,8 @@ function buildCounty(c, id) {
   <!-- REBATE DETAIL -->
   <section class="section section-alt">
     <div class="wrap">
-      <div class="section-eyebrow">Savings for ${c.name} Homeowners</div>
-      <h2 class="section-h2">Your <span class="gold">Rebate Breakdown</span></h2>
+      <div class="section-eyebrow">Incentives for ${c.name} Homeowners</div>
+      <h2 class="section-h2">Your <span class="gold">${c.isNJ ? 'Incentive Breakdown' : 'Incentive Overview'}</span></h2>
       <p class="section-sub">${c.rebateDesc}</p>
       <div class="honest-note">
         <div class="honest-note-icon">📋</div>
@@ -343,6 +343,13 @@ function buildCounty(c, id) {
    LEAD PROFIT ESTIMATOR — Job Intelligence Engine
    Returns full scoring for any lead object
 ═══════════════════════════════════════════════════════════════ */
+function getIncentiveText(l) {
+  if ((l.state || '').toUpperCase() === 'NJ') {
+    return 'PSE&G make-ready incentive may apply ($50–$1,500)';
+  }
+  return 'No current PECO install rebate; federal tax credit may apply';
+}
+
 function getJobIntelligence(l) {
   const panelSize    = l.panelSize    || 'notsure';
   const distance     = l.distance     || 'notsure';
@@ -423,7 +430,11 @@ function getJobIntelligence(l) {
   if (homeType === 'condo' || homeType === 'apartment') flags.push('⚠ Condo/apartment — confirm electrical access with HOA or building management');
   if (panelLoc === 'outside') flags.push('ℹ Outdoor panel — weatherproof conduit/enclosure may be required');
   if (isFarRun) flags.push('ℹ Long conduit run (50+ ft) — plan for additional materials and labor');
-  if (l.rebate) flags.push(`💵 Eligible rebate: ${l.rebate}`);
+  if (l.state === 'NJ') {
+    flags.push('💵 Incentive: PSE&G make-ready incentive may apply ($50–$1,500) — eligibility varies by project');
+  } else {
+    flags.push('💵 Incentive: No current PECO install rebate; federal tax credit may apply (up to $1,000 for qualifying installs by June 30, 2026)');
+  }
 
   return {
     complexity,
@@ -3370,8 +3381,8 @@ function buildIntelCard(l) {
         <div><span class="intel-badge" style="color:${ji.profitColor};background:${ji.profitBg};border-color:${ji.profitColor}40">● ${ji.profit}</span></div>
       </div>
       <div class="intel-cell">
-        <div class="intel-label">Rebate Available</div>
-        <div class="intel-val">${l.rebate || '—'}</div>
+        <div class="intel-label">Incentive</div>
+        <div class="intel-val">${getIncentiveText(l)}</div>
       </div>
     </div>
     <div class="intel-card-footer">
@@ -3624,7 +3635,7 @@ function openLeadDetail(id) {
           <div class="detail-row"><div class="detail-label">Service</div><div class="detail-value">${l.service}</div></div>
           <div class="detail-row"><div class="detail-label">Charger Brand</div><div class="detail-value">${l.charger}</div></div>
           <div class="detail-row"><div class="detail-label">Install Location</div><div class="detail-value">${(l.installLocation||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())||'—'}</div></div>
-          <div class="detail-row"><div class="detail-label">Rebate</div><div class="detail-value"><span class="rebate-tag">${l.rebate}</span></div></div>
+          <div class="detail-row"><div class="detail-label">Incentive</div><div class="detail-value"><span class="rebate-tag">${getIncentiveText(l)}</span></div></div>
           <div class="detail-row"><div class="detail-label">Est. Value</div><div class="detail-value" style="color:var(--green);font-weight:600;font-size:1.05rem">$${l.value.toLocaleString()}</div></div>
           ${l.quoteAmount != null ? `<div class="detail-row"><div class="detail-label">Quoted Price</div><div class="detail-value" style="color:#a78bfa;font-weight:700;font-size:1.05rem">$${Number(l.quoteAmount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}${l.quoteUpdatedAt?`<span style="font-size:.72rem;color:var(--gray);font-weight:400;margin-left:8px">saved ${sanitizeHTML(l.quoteUpdatedAt)}</span>`:''}</div></div>` : ''}
           ${l.quoteNotes ? `<div class="detail-row"><div class="detail-label">Quote Notes</div><div class="detail-value" style="font-size:.85rem;color:var(--silver)">${sanitizeHTML(l.quoteNotes)}</div></div>` : ''}
@@ -4065,7 +4076,8 @@ function openQuoteModal(leadId) {
     }
     items.push('Charger mounting and connection');
     items.push('Circuit breaker installation');
-    if (l.rebate) items.push(`Rebate paperwork (${l.rebate})`);
+    if (l.state === 'NJ') items.push('PSE&G make-ready incentive paperwork (eligibility varies)');
+    else items.push('Federal tax credit documentation (up to $1,000 for qualifying installs)');
     if (l.county && ['Burlington','Camden','Gloucester'].some(c=>l.county.includes(c))) items.push('NJ permit coordination');
     else items.push('PA permit coordination if required');
     return items;

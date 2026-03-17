@@ -287,12 +287,12 @@ body::before {
 .hero-body {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: 56px;
+  grid-template-columns: 1fr 460px;
+  gap: 40px;
   align-items: center;
   position: relative;
   z-index: 2;
-  padding: 72px 80px 56px;
+  padding: 72px 60px 56px;
   max-width: 1360px;
   margin: 0 auto;
   width: 100%;
@@ -341,7 +341,7 @@ body::before {
 .hero-desc {
   font-size: 1.05rem;
   color: var(--steel);
-  max-width: 520px;
+  max-width: 560px;
   line-height: 1.78;
   margin-bottom: 36px;
   font-weight: 400;

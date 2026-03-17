@@ -173,7 +173,7 @@ function buildCounty(c, id) {
 
           <ul class="cp-checks">${checks}</ul>
 
-          <a href="tel:${c.tel}" class="cp-phone">📞 ${c.phone}</a>
+          <a href="tel:${c.tel}" class="cp-phone" data-no-call-intercept="true">📞 ${c.phone}</a>
         </div>
 
         <!-- FORM -->
@@ -230,7 +230,7 @@ function buildCounty(c, id) {
           <div class="form-success" id="cpfs-${id}">
             <div class="success-icon">⚡</div>
             <div class="success-h">Request Sent!</div>
-            <p class="success-p">A ${c.name} electrician calls within 2 hours.<br><a href="tel:${c.tel}" style="color:var(--orange);">${c.phone}</a></p>
+            <p class="success-p">A ${c.name} electrician calls within 2 hours.<br><a href="tel:${c.tel}" style="color:var(--orange);" data-no-call-intercept="true">${c.phone}</a></p>
           </div>
         </div>
       </div>
@@ -279,7 +279,7 @@ function buildCounty(c, id) {
         <div class="section-eyebrow" style="justify-content:center;margin-bottom:16px;">${c.name} · ${c.state}</div>
         <h2 class="cta-h">Ready to Charge<br><span>in ${c.name.split(' ')[0]}?</span></h2>
         <p class="cta-p">Call our ${c.name} team or submit the form above. Licensed electrician calls within 2 hours. Same-week installs available.</p>
-        <a href="tel:${c.tel}" class="cta-phone-big">⚡ ${c.phone}</a>
+        <a href="tel:${c.tel}" class="cta-phone-big" data-no-call-intercept="true">⚡ ${c.phone}</a>
         <div class="cta-btns">
           <a class="pill-btn charge xl" onclick="window.scrollTo({top:0,behavior:'smooth'})">Get My Free Quote</a>
           <a class="pill-btn outline xl" onclick="goHome();setTimeout(()=>sid('counties'),80)">← All Counties</a>
@@ -320,14 +320,14 @@ function buildCounty(c, id) {
         <div class="footer-col">
           <h5>Contact</h5>
           <ul>
-            <li><a href="tel:${WEBSITE_PHONE.tel}">PA: ${WEBSITE_PHONE.display}</a></li>
-            <li><a href="tel:${WEBSITE_PHONE.tel}">NJ: ${WEBSITE_PHONE.display}</a></li>
+            <li><a href="tel:${WEBSITE_PHONE.tel}" data-no-call-intercept="true">PA: ${WEBSITE_PHONE.display}</a></li>
+            <li><a href="tel:${WEBSITE_PHONE.tel}" data-no-call-intercept="true">NJ: ${WEBSITE_PHONE.display}</a></li>
             <li><a href="mailto:expertevinstalls@gmail.com">expertevinstalls@gmail.com</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-bottom">
-        <div class="footer-copy">© 2025 Expert EV Installers · ${c.name} · ${c.state} Licensed</div>
+        <div class="footer-copy">© 2026 Expert EV Installers · ${c.name} · ${c.state} Licensed</div>
         <button onclick="goHome()" class="pill-btn outline" style="padding:7px 18px;font-size:0.72rem;">← All Counties</button>
       </div>
     </div>

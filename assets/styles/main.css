@@ -469,7 +469,7 @@ body::before {
 }
 
 .form-top {
-  padding: 26px 28px 20px;
+  padding: 28px 32px 22px;
   border-bottom: 1px solid var(--border3);
 }
 
@@ -506,9 +506,9 @@ body::before {
 
 .form-note { font-size: 0.8rem; color: var(--mid-grey); font-family: 'Exo 2', sans-serif; }
 
-.form-fields { padding: 20px 28px 24px; }
+.form-fields { padding: 24px 32px 32px; }
 
-.ff { margin-bottom: 13px; }
+.ff { margin-bottom: 18px; }
 
 .ff label {
   display: block;
@@ -517,7 +517,7 @@ body::before {
   letter-spacing: 4px;
   text-transform: uppercase;
   color: var(--steel);
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-family: 'Share Tech Mono', monospace;
 }
 
@@ -553,7 +553,7 @@ body::before {
 }
 .ff textarea { resize: none; height: 68px; }
 
-.ff-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ff-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
 .form-submit-btn {
   width: 100%;

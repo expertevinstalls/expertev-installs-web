@@ -142,7 +142,7 @@
           </div>
           <div class="form-note">Answer a few quick questions — a licensed electrician reviews your setup.</div>
           <div class="response-badge-row">
-            <div class="response-badge"><span class="rb-dot"></span>⚡ Electrician calls within 2 hours during business hours</div>
+            <div class="response-badge"><span class="rb-dot"></span>⚡ 2-hour response (business hours)</div>
             <div class="form-timer-label">⏱ Takes under 30 seconds</div>
           </div>
         </div>
@@ -151,33 +151,37 @@
             <div class="ff"><label>First Name</label><input type="text" name="first_name" placeholder="John"></div>
             <div class="ff"><label>Last Name</label><input type="text" name="last_name" placeholder="Smith"></div>
           </div>
-          <div class="ff"><label>Phone Number</label><input type="tel" name="phone" placeholder="(215) 555-0000" id="main-phone-input"></div>
-          <div class="ff"><label>Email</label><input type="email" name="email" placeholder="john@email.com"></div>
-          <div class="ff">
-            <label>Your County</label>
-            <select name="county">
-              <option value="">Select your county...</option>
-              <option>Philadelphia County, PA</option>
-              <option>Montgomery County, PA</option>
-              <option>Bucks County, PA</option>
-              <option>Chester County, PA</option>
-              <option>Delaware County, PA</option>
-              <option>Burlington County, NJ</option>
-              <option>Camden County, NJ</option>
-              <option>Gloucester County, NJ</option>
-            </select>
+          <div class="ff-row">
+            <div class="ff"><label>Phone Number</label><input type="tel" name="phone" placeholder="(215) 555-0000" id="main-phone-input"></div>
+            <div class="ff"><label>Email</label><input type="email" name="email" placeholder="john@email.com"></div>
           </div>
-          <div class="ff">
-            <label>Home Type</label>
-            <select name="home_type">
-              <option value="">What type of home?</option>
-              <option value="single_family">Single Family Home</option>
-              <option value="townhouse">Townhouse</option>
-              <option value="condo">Condo</option>
-              <option value="apartment">Apartment</option>
-              <option value="commercial">Commercial / Business</option>
-              <option value="notsure">Not Sure</option>
-            </select>
+          <div class="ff-row">
+            <div class="ff">
+              <label>Your County</label>
+              <select name="county">
+                <option value="">Select your county...</option>
+                <option>Philadelphia County, PA</option>
+                <option>Montgomery County, PA</option>
+                <option>Bucks County, PA</option>
+                <option>Chester County, PA</option>
+                <option>Delaware County, PA</option>
+                <option>Burlington County, NJ</option>
+                <option>Camden County, NJ</option>
+                <option>Gloucester County, NJ</option>
+              </select>
+            </div>
+            <div class="ff">
+              <label>Home Type</label>
+              <select name="home_type">
+                <option value="">What type of home?</option>
+                <option value="single_family">Single Family Home</option>
+                <option value="townhouse">Townhouse</option>
+                <option value="condo">Condo</option>
+                <option value="apartment">Apartment</option>
+                <option value="commercial">Commercial / Business</option>
+                <option value="notsure">Not Sure</option>
+              </select>
+            </div>
           </div>
           <div class="ff">
             <label>EV Vehicle</label>
@@ -216,27 +220,29 @@
               </select>
             </div>
           </div>
-          <div class="ff">
-            <label>Installation Location</label>
-            <select name="install_location">
-              <option value="">Where will it be installed?</option>
-              <option value="garage">Garage</option>
-              <option value="outside_wall">Outside wall</option>
-              <option value="driveway">Driveway</option>
-              <option value="basement">Basement</option>
-              <option value="utility_room">Utility room</option>
-            </select>
-          </div>
-          <div class="ff">
-            <label>EV Charger Brand</label>
-            <select name="charger_brand" id="main-charger-brand">
-              <option value="">Select charger brand...</option>
-              <option value="tesla">Tesla</option>
-              <option value="chargepoint">ChargePoint</option>
-              <option value="juicebox">JuiceBox</option>
-              <option value="wallbox">Wallbox</option>
-              <option value="not_purchased">Not purchased yet</option>
-            </select>
+          <div class="ff-row">
+            <div class="ff">
+              <label>Installation Location</label>
+              <select name="install_location">
+                <option value="">Where will it be installed?</option>
+                <option value="garage">Garage</option>
+                <option value="outside_wall">Outside wall</option>
+                <option value="driveway">Driveway</option>
+                <option value="basement">Basement</option>
+                <option value="utility_room">Utility room</option>
+              </select>
+            </div>
+            <div class="ff">
+              <label>EV Charger Brand</label>
+              <select name="charger_brand" id="main-charger-brand">
+                <option value="">Select charger brand...</option>
+                <option value="tesla">Tesla</option>
+                <option value="chargepoint">ChargePoint</option>
+                <option value="juicebox">JuiceBox</option>
+                <option value="wallbox">Wallbox</option>
+                <option value="not_purchased">Not purchased yet</option>
+              </select>
+            </div>
           </div>
           <div class="ff-row">
             <div class="ff">

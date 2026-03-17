@@ -295,7 +295,7 @@ function buildCounty(c, id) {
         <div>
           <img src="expertev-logo (1).png" class="footer-logo-img" alt="Expert EV Installers">
           <div class="footer-brand">Expert<em>EV</em> Installers</div>
-          <p class="footer-desc">Licensed EV charger installation in ${c.name}, ${c.state}. Powered by Red Flow Electric. Permitted, insured, warranted.</p>
+          <p class="footer-desc">Licensed EV charger installation in ${c.name}, ${c.state}. Every installation completed by a licensed electrician within our contractor network. Permitted, insured, warranted.</p>
           <div class="footer-lic">✓ ${c.state} Licensed · Fully Insured</div>
         </div>
         <div class="footer-col">

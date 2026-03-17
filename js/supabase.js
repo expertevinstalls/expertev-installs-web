@@ -723,6 +723,7 @@ function _settingsToRow(s) {
     admin_email:      s.adminEmail     ?? '',
     pa_phone:         s.paPhone        ?? '',
     nj_phone:         s.njPhone        ?? '',
+    admin_sms_phone:  s.adminSmsPhone  ?? '',
     lead_fee:         s.leadFee        ?? 75,
     commission_pct:   s.commissionPct  ?? 15,
     email_alerts:     s.emailAlerts    ?? true,
@@ -742,6 +743,7 @@ function _rowToSettings(row) {
     adminEmail:     row.admin_email      ?? '',
     paPhone:        row.pa_phone         ?? '',
     njPhone:        row.nj_phone         ?? '',
+    adminSmsPhone:  row.admin_sms_phone  ?? '',
     leadFee:        row.lead_fee         ?? 75,
     commissionPct:  row.commission_pct   ?? 15,
     emailAlerts:    row.email_alerts     ?? true,
@@ -1193,6 +1195,42 @@ function sbSubscribeContractors(onChange) {
 }
 
 
-/* ── 14. AUTO-INIT ────────────────────────────────────────── */
+/* ── 14. SMS ALERTS ───────────────────────────────────────── */
+
+/**
+ * Send an SMS via the send-sms-alert Supabase Edge Function.
+ * Twilio credentials live in Supabase project secrets — never in browser code.
+ *
+ * to:      destination phone number (any common US format — normalized to E.164 server-side)
+ * message: SMS body text (keep under 160 chars to avoid multi-part billing)
+ *
+ * Fire-and-forget — errors are logged but never thrown to callers.
+ * Returns { ok: true } or { error: string }.
+ */
+async function sbSendSms(to, message) {
+  if (!to || !message) return { error: 'to and message required' };
+  try {
+    const fnUrl = `${_SB_URL}/functions/v1/send-sms-alert`;
+    const res   = await fetch(fnUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': _SB_KEY },
+      body:    JSON.stringify({ to, message }),
+    });
+    let body = {};
+    try { body = await res.json(); } catch { /* non-JSON */ }
+    if (!res.ok) {
+      console.error('[SMS] sbSendSms error | to:', to, '| status:', res.status, '| error:', body?.error || `HTTP ${res.status}`);
+      return { error: body?.error || `HTTP ${res.status}` };
+    }
+    console.log('[SMS] Sent ✓ | to:', to, '| sid:', body?.sid ?? '(no sid)');
+    return { ok: true };
+  } catch (err) {
+    console.error('[SMS] sbSendSms fetch error:', err.message);
+    return { error: err.message };
+  }
+}
+
+
+/* ── 15. AUTO-INIT ────────────────────────────────────────── */
 // Attempt to initialize on script load. Fails silently if not configured.
 initSupabase();

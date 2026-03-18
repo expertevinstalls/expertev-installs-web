@@ -14,7 +14,14 @@ const CD = {
     rebateDesc:"There is currently no PECO residential EV charger installation rebate. Philadelphia homeowners may still qualify for the federal EV charger tax credit — 30% of installation costs, up to $1,000 — for qualifying properties placed in service by June 30, 2026. Eligibility depends in part on property location. We provide documentation to support your tax filing.",
     permit:"Philadelphia L&I (Licenses & Inspections) handles electrical permits for all Philadelphia installations. We file the application, schedule the electrical inspection, and guarantee passing on the first visit.",
     fact:"Philadelphia is one of the fastest-growing EV cities in the Northeast, with EV registrations up over 40% in 2024. Demand for home charger installations is outpacing supply — book early.",
-    pop:"1.57M"
+    pop:"1.57M",
+    localContext:{
+      homeTypes:"Rowhomes, twins, and semi-detached homes; some attached garages in rowhouse conversions",
+      install:"Panel typically in basement or rear utility area; charger on exterior wall, attached garage wall, or dedicated parking area",
+      utility:"PECO service area — no PECO residential install rebate; federal tax credit may apply for qualifying properties",
+      permitNote:"Philadelphia L&I handles all electrical permits citywide — single permit authority, no township variation",
+      localKnow:"Many Philadelphia rowhomes were built before 1960 and have 100A panels with limited breaker space. Routing from the basement to usable parking can require conduit runs along exterior walls. We assess this before quoting — no guesswork."
+    }
   },
   montgomery: {
     name:"Montgomery County", state:"PA", isNJ:false,
@@ -28,7 +35,14 @@ const CD = {
     rebateDesc:"There is currently no PECO residential EV charger installation rebate. Montgomery County homeowners may qualify for the federal EV charger tax credit — 30% of costs, up to $1,000 — for qualifying properties placed in service by June 30, 2026. Eligibility depends on property location. We provide documentation to support your tax filing.",
     permit:"Montgomery County's 62 municipalities each have slightly different permit requirements. Our electricians have filed permits across the county and know exactly what each township requires.",
     fact:"Montgomery County leads Pennsylvania in EV registrations per capita outside Philadelphia — driven by high incomes and suburban commuter households in KOP, Lansdale, and Horsham.",
-    pop:"860K"
+    pop:"860K",
+    localContext:{
+      homeTypes:"Detached single-family homes, older colonials, and newer suburban construction across 62 municipalities",
+      install:"Typically garage wall mount with panel in adjacent basement or utility room; most homes have direct routing",
+      utility:"PECO service area — no PECO residential install rebate; federal tax credit may apply for qualifying properties",
+      permitNote:"62 separate municipalities — each with its own permit process; we file with the correct authority for your specific township",
+      localKnow:"Montgomery County's housing ranges from 1950s colonials in Jenkintown to new construction in Horsham. Panel capacity and permit timelines differ across the county's 62 municipalities. We know each township's process so your install doesn't get held up at the permit stage."
+    }
   },
   bucks: {
     name:"Bucks County", state:"PA", isNJ:false,
@@ -42,7 +56,14 @@ const CD = {
     rebateDesc:"There is currently no PECO residential EV charger installation rebate. Bucks County homeowners may qualify for the federal EV charger tax credit — 30% of costs, up to $1,000 — for qualifying properties placed in service by June 30, 2026. Eligibility depends on property location. We provide documentation to support your tax filing.",
     permit:"Bucks County has dozens of separate permit jurisdictions. We file with the correct authority for your specific borough or township — and know the typical timeline for each.",
     fact:"Many Bucks County properties are larger rural homes with detached garages — which require longer conduit runs and sometimes underground trenching. We price this transparently and do it cleanly.",
-    pop:"646K"
+    pop:"646K",
+    localContext:{
+      homeTypes:"Rural properties, detached single-family homes, older borough housing, and some newer townhome developments",
+      install:"Garage or detached garage installs; longer conduit runs and occasional underground trenching on rural properties",
+      utility:"PECO service area — no PECO residential install rebate; federal tax credit may apply for qualifying properties",
+      permitNote:"Dozens of separate borough and township permit jurisdictions — we file with the right authority for your specific address",
+      localKnow:"A solid portion of Bucks County homes sit on larger lots with detached garages or workshop buildings, which means longer wiring runs and sometimes underground conduit work. We scope this accurately at the site visit so the quote reflects the real job."
+    }
   },
   chester: {
     name:"Chester County", state:"PA", isNJ:false,
@@ -56,7 +77,14 @@ const CD = {
     rebateDesc:"There is currently no PECO residential EV charger installation rebate. Chester County homeowners may qualify for the federal EV charger tax credit — 30% of costs, up to $1,000 — for qualifying properties placed in service by June 30, 2026. Eligibility depends on property location. We provide documentation to support your tax filing.",
     permit:"Chester County spans dozens of municipalities from Tredyffrin to West Sadsbury. Our electricians handle permits across the full county and are familiar with each township's requirements.",
     fact:"Chester County has the highest median household income in Pennsylvania and one of the highest EV ownership rates. Tesla and Rivian are the most commonly installed brands in our Chester County jobs.",
-    pop:"540K"
+    pop:"540K",
+    localContext:{
+      homeTypes:"Single-family homes, townhomes, and some rural properties with detached garages across township municipalities",
+      install:"Garage wall mounts most common; some homes need longer runs for detached garage or driveway-side mounting",
+      utility:"PECO service area — no PECO residential install rebate; federal tax credit may apply for qualifying properties",
+      permitNote:"Township permits required across all Chester County municipalities — Tredyffrin to West Sadsbury, we handle each one",
+      localKnow:"Chester County has strong EV ownership and well-kept older housing in townships like Tredyffrin, Easttown, and West Chester borough. Permits are handled at the township level, not through a central county office — knowing the right process for each town keeps installs on schedule."
+    }
   },
   delaware: {
     name:"Delaware County", state:"PA", isNJ:false,
@@ -70,7 +98,14 @@ const CD = {
     rebateDesc:"There is currently no PECO residential EV charger installation rebate. Delaware County homeowners may qualify for the federal EV charger tax credit — 30% of costs, up to $1,000 — for qualifying properties placed in service by June 30, 2026. Eligibility depends on property location. We provide documentation to support your tax filing.",
     permit:"Delaware County has 49 separate municipalities — one of the highest densities of separate permit authorities in Pennsylvania. We navigate this for you so the permit doesn't slow down your install.",
     fact:"Approximately 30% of Delaware County homes were built between 1940–1970 and have 60A or 100A panels. We're Delaware County's panel upgrade specialists and bundle panel + charger in one visit.",
-    pop:"576K"
+    pop:"576K",
+    localContext:{
+      homeTypes:"Dense suburban housing — twins, duplexes, older single-family homes; many built 1940–1970",
+      install:"Basement or utility room panel; often tight routing to attached garage, rear exterior wall, or converted parking area",
+      utility:"PECO service area — no PECO residential install rebate; federal tax credit may apply for qualifying properties",
+      permitNote:"49 separate municipalities — one of the highest permit authority densities in PA; we track requirements for each one",
+      localKnow:"Delaware County has a high concentration of homes with 60–100A panels that may need upgrading before an EV charger can be installed safely. We catch this during the free site assessment — before you've committed to anything — and can bundle the upgrade with the charger install."
+    }
   },
   burlington: {
     name:"Burlington County", state:"NJ", isNJ:true,
@@ -84,7 +119,14 @@ const CD = {
     rebateDesc:"PSE&G customers in Burlington County NJ may qualify for a make-ready incentive of $50–$1,500 per charger toward wiring, permits, and panel upgrade costs — eligibility and amounts vary by project. We also provide documentation for the federal EV charger tax credit (30% of costs, up to $1,000, for qualifying installs placed in service by June 30, 2026).",
     permit:"NJ requires specific electrical permits and township approvals. Our NJ-licensed electricians file all paperwork and schedule the NJ electrical inspection — passing the first time, every time.",
     fact:"Burlington County is one of NJ's fastest-growing counties, with major new residential development in Mount Laurel and Evesham driving rapid EV adoption among new homeowners.",
-    pop:"461K"
+    pop:"461K",
+    localContext:{
+      homeTypes:"Suburban single-family homes and newer construction, particularly in Mount Laurel, Evesham, and Moorestown",
+      install:"Attached garage installs typical; most newer homes have direct panel-to-garage routing with 200A service",
+      utility:"PSE&G service area — make-ready incentive of $50–$1,500 may apply for eligible customers",
+      permitNote:"NJ electrical permit plus township approval required; NJ electrical inspection coordinated by our licensed team",
+      localKnow:"Burlington County's newer residential growth in Mount Laurel and Evesham means many homes already have 200A panels and attached garages — which makes for straightforward installs. The PSE&G make-ready incentive may reduce out-of-pocket cost for eligible customers; we walk you through it."
+    }
   },
   camden: {
     name:"Camden County", state:"NJ", isNJ:true,
@@ -98,7 +140,14 @@ const CD = {
     rebateDesc:"PSE&G customers in Camden County NJ may qualify for a make-ready incentive of $50–$1,500 per charger toward wiring, permits, and panel upgrade costs — eligibility and amounts vary by project. We also provide documentation for the federal EV charger tax credit (30% of costs, up to $1,000, for qualifying installs placed in service by June 30, 2026).",
     permit:"All Camden County NJ electrical permits filed and NJ inspection scheduled by our NJ-licensed team. Cherry Hill, Voorhees, and surrounding municipalities — we handle each one.",
     fact:"Camden County is the most EV-dense county in South Jersey. Cherry Hill and Voorhees lead the county in EV ownership, with Tesla and BMW i-series being the most common vehicles we install for.",
-    pop:"510K"
+    pop:"510K",
+    localContext:{
+      homeTypes:"Established suburban neighborhoods — single-family homes in Cherry Hill, Voorhees, Haddonfield, and surrounding towns",
+      install:"Garage wall mounts most common; Cherry Hill and Voorhees homes often have direct panel-to-garage routing",
+      utility:"PSE&G service area — make-ready incentive of $50–$1,500 may apply for eligible customers",
+      permitNote:"All NJ electrical permits filed and NJ electrical inspection scheduled by our NJ-licensed team",
+      localKnow:"Camden County is South Jersey's most EV-dense county, and Cherry Hill and Voorhees see heavy install demand. Most homes in those areas have attached garages and modern panels — but some of Camden County's older core municipalities have housing that benefits from a site assessment first."
+    }
   },
   gloucester: {
     name:"Gloucester County", state:"NJ", isNJ:true,
@@ -112,7 +161,14 @@ const CD = {
     rebateDesc:"PSE&G customers in Gloucester County NJ may qualify for a make-ready incentive of $50–$1,500 per charger toward wiring, permits, and panel upgrade costs — eligibility and amounts vary by project. We also provide documentation for the federal EV charger tax credit (30% of costs, up to $1,000, for qualifying installs placed in service by June 30, 2026).",
     permit:"All Gloucester County NJ electrical permits filed. Our NJ-licensed electricians handle permit applications and NJ electrical inspections across every Gloucester County municipality.",
     fact:"Gloucester County is experiencing rapid residential development in Washington Township and Monroe Township, making it one of the fastest-growing EV charger markets in South Jersey.",
-    pop:"300K"
+    pop:"300K",
+    localContext:{
+      homeTypes:"Suburban and semi-rural homes; newer construction in Washington Township and Monroe Township",
+      install:"Garage installs typical; newer homes often have attached garages and clean panel-to-garage routing",
+      utility:"PSE&G service area — make-ready incentive of $50–$1,500 may apply for eligible customers",
+      permitNote:"All NJ permits filed across every Gloucester County municipality; NJ electrical inspection handled by our team",
+      localKnow:"Gloucester County is growing fast — Washington Township and Monroe Township in particular have seen significant new construction where homes already have attached garages and modern 200A panels. For older housing in Woodbury and Deptford, a site assessment helps catch any panel constraints before scheduling."
+    }
   }
 };
 
@@ -260,6 +316,37 @@ function buildCounty(c, id) {
       </div>
     </div>
   </section>
+
+  <!-- COMMON INSTALL CONDITIONS -->
+  ${c.localContext ? `
+  <section class="section">
+    <div class="wrap">
+      <div class="section-eyebrow">Local Install Context</div>
+      <h2 class="section-h2">What Homeowners in <span>${c.name}</span> Should Know</h2>
+      <p class="county-local-note">${c.localContext.localKnow}</p>
+      <div class="county-conditions">
+        <div class="county-condition-item">
+          <div class="cci-label">Common Home Types</div>
+          <div class="cci-value">${c.localContext.homeTypes}</div>
+        </div>
+        <div class="county-condition-item">
+          <div class="cci-label">Typical Install Location</div>
+          <div class="cci-value">${c.localContext.install}</div>
+        </div>
+        <div class="county-condition-item">
+          <div class="cci-label">Utility &amp; Incentive</div>
+          <div class="cci-value">${c.localContext.utility}</div>
+        </div>
+        <div class="county-condition-item">
+          <div class="cci-label">Permit Handling</div>
+          <div class="cci-value">${c.localContext.permitNote}</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <a class="pill-btn charge" onclick="window.scrollTo({top:0,behavior:'smooth'})">Get a Free Quote for ${c.name.split(' ')[0]} →</a>
+      </div>
+    </div>
+  </section>` : ''}
 
   <!-- REBATE DETAIL -->
   <section class="section section-alt">

@@ -40,11 +40,8 @@ const CONTRACTOR_NAV = [
 const PAGE_TITLES = { dashboard:'Dashboard Overview', pipeline:'Lead Pipeline', 'all-leads':'All Leads', assign:'Assign Leads', contractors:'Contractors', revenue:'Revenue & Billing', leaderboard:'Contractor Leaderboard', 'sms-templates':'SMS Scripts & Sales Tools', settings:'Settings & Security', 'my-leads':'My Leads', 'my-pipeline':'My Pipeline', 'my-revenue':'Performance Analytics', 'my-profile':'My Profile' };
 
 /* ── Dev mode flag ──────────────────────────────────────────────────────────
-   Set to true  → local USERS fallback is active when Supabase auth fails.
-                  Demo credentials (expertevinstalls@gmail.com / EV!nstall_LeadPortal_2026#) will work
-                  even while Supabase is connected.
+   Set to true  → local USERS fallback is active (for local testing only).
    Set to false → Supabase Auth is the only login path. No local fallback.
-                  Set this to false before going live with real users.
    ─────────────────────────────────────────────────────────────────────────── */
 const DEV_MODE = false;
 

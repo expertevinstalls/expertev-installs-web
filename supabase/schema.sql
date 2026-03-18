@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE TABLE IF NOT EXISTS notes (
   id              UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
   lead_id         TEXT        NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
-  author          TEXT        NOT NULL,          -- 'Admin', 'Red Flow Electric', 'System'
+  author          TEXT        NOT NULL,          -- 'Admin', 'Contractor Name', 'System'
   text            TEXT        NOT NULL,
   created_display TEXT        DEFAULT '',        -- human-readable: "Mar 9", "Just now"
   created_at      TIMESTAMPTZ DEFAULT NOW()
@@ -124,7 +124,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
   auto_assign      BOOLEAN     DEFAULT FALSE,
   follow_up_alerts BOOLEAN     DEFAULT TRUE,
   review_requests  BOOLEAN     DEFAULT FALSE,
-  google_maps_key  TEXT        DEFAULT '',
   checklist_done   JSONB       DEFAULT '{}',
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );

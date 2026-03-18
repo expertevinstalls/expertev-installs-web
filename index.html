@@ -477,6 +477,50 @@
   </section>
 
   <!-- ═══════════════════════════════════════════
+       SECTION 1B — INSTALLATION OPTIONS
+  ═══════════════════════════════════════════ -->
+  <section class="cro-section-alt" id="install-options">
+    <div class="wrap">
+      <div class="section-eyebrow">How It Works for Your Home</div>
+      <h2 class="section-h2">EV Charger <span>Installation Options</span></h2>
+      <p class="section-sub">Every home is different. Here's how we approach residential installs — and what each path includes.</p>
+      <div class="install-options-grid">
+
+        <!-- Option 1 — Standard -->
+        <div class="install-option-card">
+          <div class="install-option-label">Option 1</div>
+          <h3 class="install-option-title">Standard Installation</h3>
+          <p class="install-option-desc">Designed for typical residential homes with adequate panel capacity and a straightforward install location. Efficient scheduling, clean work, and a properly installed Level 2 charger — ready to use the same day.</p>
+          <ul class="install-option-list">
+            <li>Dedicated 240V circuit installation</li>
+            <li>Charger mounting and wiring</li>
+            <li>Full circuit test before we leave</li>
+            <li>Permit requirements vary by township and project scope</li>
+          </ul>
+          <div class="install-option-note">Best for: newer homes with available panel capacity and an interior install location.</div>
+        </div>
+
+        <!-- Option 2 — Fully Code-Compliant (Recommended) -->
+        <div class="install-option-card install-option-card--recommended">
+          <div class="install-option-badge">Recommended</div>
+          <div class="install-option-label">Option 2</div>
+          <h3 class="install-option-title">Fully Code-Compliant Installation</h3>
+          <p class="install-option-desc">The complete, documentation-backed installation — from permit filing through final inspection. Everything is handled by our licensed electricians, documented for your records, and built to last.</p>
+          <ul class="install-option-list">
+            <li>Permit filing handled where required</li>
+            <li>Inspection coordination and sign-off</li>
+            <li>Code-compliant installation, documented start to finish</li>
+            <li>Written record for future resale or insurance purposes</li>
+          </ul>
+          <div class="install-option-guide">Most homeowners choose this option for long-term safety and peace of mind.</div>
+          <a class="pill-btn charge" style="margin-top:20px;display:inline-block" onclick="focusForm()">Get a Free Quote →</a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
        SECTION 2 — PANEL UPGRADE EDUCATION
   ═══════════════════════════════════════════ -->
   <section class="cro-section-alt" id="cro-panel">
@@ -1233,6 +1277,10 @@
         <div class="footer-copy">© 2026 Expert EV Installers · PA & NJ Licensed Electrical Contractors · Licensed Contractor Network</div>
         <div class="footer-copy">Licensed · Insured · Permitted · Warranted</div>
         <div class="footer-copy" style="margin-top:8px;opacity:0.6;font-size:0.78rem;">Expert EV Installers is a contractor referral platform that connects homeowners with licensed electricians. All electrical work is performed by independent licensed electricians within our contractor network.</div>
+        <div class="footer-copy" style="margin-top:12px;font-size:0.78rem;">
+          <a onclick="openLegal('privacy')" style="color:var(--steel);cursor:pointer;text-decoration:underline;text-underline-offset:3px;margin-right:18px">Privacy Policy</a>
+          <a onclick="openLegal('terms')" style="color:var(--steel);cursor:pointer;text-decoration:underline;text-underline-offset:3px">Terms of Service</a>
+        </div>
       </div>
     </div>
   </footer>
@@ -1467,6 +1515,105 @@ if (typeof _setupAuthStateChange === 'function') {
     }
   } catch(e) { console.warn('[SessionRestore]', e.message); }
 })();
+</script>
+
+<!-- ====================================================
+     LEGAL MODALS — Privacy Policy & Terms of Service
+==================================================== -->
+<div id="legal-modal-overlay" onclick="closeLegal()" style="display:none;position:fixed;inset:0;background:rgba(3,10,16,0.88);z-index:9000;overflow-y:auto;padding:40px 20px">
+  <div onclick="event.stopPropagation()" style="max-width:720px;margin:0 auto;background:#071421;border:1px solid rgba(25,184,240,0.15);border-radius:14px;padding:40px 44px 48px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">
+      <h2 id="legal-modal-title" style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;color:#f0f6ff;margin:0"></h2>
+      <button onclick="closeLegal()" style="background:none;border:none;color:#7a9ab8;font-size:1.4rem;cursor:pointer;line-height:1;padding:0 0 0 16px">✕</button>
+    </div>
+    <div id="legal-modal-body" style="font-family:'Exo 2',sans-serif;font-size:0.88rem;color:#7a9ab8;line-height:1.75"></div>
+    <div style="margin-top:32px;text-align:center">
+      <button onclick="closeLegal()" style="background:rgba(25,184,240,0.1);border:1px solid rgba(25,184,240,0.25);color:#19b8f0;border-radius:8px;padding:10px 28px;font-family:'DM Sans',sans-serif;font-size:0.9rem;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const _LEGAL = {
+  privacy: {
+    title: 'Privacy Policy',
+    body: `
+      <p style="color:#a8bfd4;margin-bottom:20px"><strong>Effective date: March 2026</strong></p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:0 0 8px">1. Who We Are</h3>
+      <p>Expert EV Installers ("we," "us," or "our") is a contractor referral platform that connects homeowners in Pennsylvania and New Jersey with licensed electrical contractors for EV charger installation. We operate the website at expertevinstallers.com.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">2. Information We Collect</h3>
+      <p>When you submit a quote request, we collect:</p>
+      <ul style="margin:8px 0 0 18px;line-height:2">
+        <li>Name, phone number, and email address</li>
+        <li>Home type, county, and installation details (panel size, charger location, etc.)</li>
+        <li>Any notes you choose to include</li>
+      </ul>
+      <p style="margin-top:10px">We do not collect payment information through our website.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">3. How We Use Your Information</h3>
+      <p>Your information is used to:</p>
+      <ul style="margin:8px 0 0 18px;line-height:2">
+        <li>Connect you with a licensed electrician in your area</li>
+        <li>Provide you with an installation quote</li>
+        <li>Communicate with you about your project</li>
+        <li>Improve our platform and service quality</li>
+      </ul>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">4. Who We Share It With</h3>
+      <p>Your contact and project information is shared with licensed electricians within the Expert EV Installers contractor network, solely for the purpose of responding to your installation request. We do not sell your personal information to third parties.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">5. Data Retention</h3>
+      <p>We retain lead information for as long as needed to fulfill the service request and for reasonable business record-keeping purposes. You may contact us to request deletion of your data at any time.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">6. Cookies &amp; Tracking</h3>
+      <p>We use CallRail for phone number tracking, which may set a cookie to attribute calls to marketing sources. We do not use advertising cookies or share data with ad networks.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">7. Contact</h3>
+      <p>For privacy questions or data deletion requests, email us at <a href="mailto:expertevinstalls@gmail.com" style="color:#19b8f0">expertevinstalls@gmail.com</a>.</p>
+    `
+  },
+  terms: {
+    title: 'Terms of Service',
+    body: `
+      <p style="color:#a8bfd4;margin-bottom:20px"><strong>Effective date: March 2026</strong></p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:0 0 8px">1. Service Description</h3>
+      <p>Expert EV Installers is a contractor referral platform. We connect homeowners with independent licensed electrical contractors. We do not directly perform electrical work. All installations are completed by independent licensed electricians within our contractor network.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">2. No Guarantee of Availability</h3>
+      <p>Submitting a quote request does not guarantee availability, pricing, or scheduling. A licensed electrician will review your submission and contact you to confirm details. Final pricing is determined after an on-site assessment.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">3. Pricing &amp; Incentives</h3>
+      <p>Price ranges shown on this website are estimates based on typical residential installations in our service area. Actual costs may vary based on your specific home, panel capacity, wiring distance, and permit requirements. Incentive programs (federal tax credits, utility rebates) are subject to program availability and individual eligibility. We do not guarantee approval for any incentive or tax credit. Consult a tax advisor for guidance on your specific situation.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">4. Contractor Relationship</h3>
+      <p>Contractors in the Expert EV Installers network are independent licensed electricians. They are not employees or agents of Expert EV Installers. All work is performed under their own license and insurance. Expert EV Installers facilitates the connection but is not a party to any installation agreement between you and the contractor.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">5. Limitation of Liability</h3>
+      <p>Expert EV Installers shall not be liable for any damages arising from the performance of electrical work by independent contractors, scheduling delays, permit processing times, or the accuracy of incentive program information. Our maximum liability for any claim related to our referral services is limited to the fees paid to us, if any.</p>
+
+      <h3 style="color:#f0f6ff;font-family:'Rajdhani',sans-serif;font-size:1.05rem;margin:20px 0 8px">6. Contact</h3>
+      <p>Questions about these terms? Email us at <a href="mailto:expertevinstalls@gmail.com" style="color:#19b8f0">expertevinstalls@gmail.com</a>.</p>
+    `
+  }
+};
+
+function openLegal(type) {
+  const doc = _LEGAL[type];
+  if (!doc) return;
+  document.getElementById('legal-modal-title').textContent = doc.title;
+  document.getElementById('legal-modal-body').innerHTML = doc.body;
+  const overlay = document.getElementById('legal-modal-overlay');
+  overlay.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLegal() {
+  document.getElementById('legal-modal-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
 </script>
 </body>
 </html>

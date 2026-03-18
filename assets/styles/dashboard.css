@@ -429,26 +429,6 @@
 }
 
 
-/* ── Coverage map: always visible, never collapses ── */
-#coverage-map-container {
-  display: block !important;
-  min-height: 240px;
-  width: 100%;
-  position: relative;
-}
-@media (max-width: 767px) {
-  #coverage-map-container {
-    height: 280px !important;
-    min-height: 280px;
-    border-radius: 0 0 14px 14px;
-  }
-}
-@media (max-width: 400px) {
-  #coverage-map-container {
-    height: 240px !important;
-    min-height: 240px;
-  }
-}
 
 /* ============================================================
    PHASE 5 RESPONSIVE ADDITIONS

@@ -909,9 +909,7 @@ function persist() {
     console.log('[VERSION] localStorage leads/notifs skipped at startup — will hydrate from Supabase after login');
     const ss = localStorage.getItem(_STORE.settings);
     if (ss) {
-      const keyBefore = settings.googleMapsKey; // preserve non-empty default
       Object.assign(settings, JSON.parse(ss));
-      if (!settings.googleMapsKey && keyBefore) settings.googleMapsKey = keyBefore;
     }
   } catch(e) { console.warn('[EEV] Could not restore persisted data:', e.message); }
 
@@ -1657,18 +1655,6 @@ function refreshAdminDashboard() {
   el.parentNode.replaceChild(newEl, el);
 }
 
-/* Replaces the coverage page node so it always reflects the current API key
-   and live lead counts. The map init runs separately via initCoverageMap(). */
-function refreshCoveragePage() {
-  const el = document.getElementById('page-coverage');
-  if (!el) return;
-  const wasActive = el.classList.contains('active');
-  const tmp = document.createElement('div');
-  tmp.innerHTML = pgCoverage();
-  const newEl = tmp.firstElementChild;
-  if (wasActive) newEl.classList.add('active');
-  el.parentNode.replaceChild(newEl, el);
-}
 
 // ═══════════════════════════════════════════════════════════════
 // BUILD ALL PAGES
@@ -2482,7 +2468,7 @@ function showAddContractorModal() {
       : `<div class="alert-box warn" style="margin-bottom:16px">⚠️ Supabase not connected — contractor will be saved locally only (no invite email).</div>`
     }
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Company Name *</label><input class="form-input" id="ac-company" placeholder="e.g. Volt Masters LLC"></div>
+      <div class="form-group"><label class="form-label">Company Name *</label><input class="form-input" id="ac-company" placeholder="e.g. Apex Electric LLC"></div>
       <div class="form-group"><label class="form-label">Contact Person *</label><input class="form-input" id="ac-contact" placeholder="Full name"></div>
     </div>
     <div class="form-row">
@@ -3114,87 +3100,6 @@ function pgRevenue() {
   </div>`;
 }
 
-// ─── COVERAGE ───────────────────────────────────────────────────
-function pgCoverage() {
-  const pa = ['Philadelphia','Montgomery','Bucks','Chester','Delaware'];
-  const nj = ['Burlington','Camden','Gloucester'];
-  return `<div class="page" id="page-coverage">
-    <div class="page-header"><div><h1>Coverage Map</h1><p>Active territory — PA and NJ</p></div></div>
-    <div id="coverage-map-alert"></div>
-    <div class="grid-2">
-      <div class="card" style="overflow:visible"><div class="card-header"><span>🗺️</span><div class="card-title">Territory Map</div></div>
-        <div class="card-body" style="overflow:visible;padding:0"><div id="coverage-map-container" style="height:340px;border-radius:0 0 14px 14px;background:var(--navy-light);width:100%;display:block"></div></div>
-      </div>
-      <div class="card"><div class="card-header"><span>📍</span><div class="card-title">County Status</div></div>
-        <div class="card-body" style="padding:16px 20px">
-          <div style="font-family:'Rajdhani',sans-serif;font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Pennsylvania</div>
-          ${pa.map(c=>{const cnt=leads.filter(l=>l.county===c).length;const done=leads.filter(l=>l.county===c&&l.status==='completed').length;return`<div class="county-row"><div class="county-name">${c}</div><div style="flex:1;font-size:.78rem;color:var(--gray)">${cnt} leads · ${done} done</div><span class="badge badge-completed" style="font-size:.68rem">Active</span></div>`;}).join('')}
-          <div style="font-family:'Rajdhani',sans-serif;font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 12px">New Jersey</div>
-          ${nj.map(c=>{const cnt=leads.filter(l=>l.county===c).length;const done=leads.filter(l=>l.county===c&&l.status==='completed').length;return`<div class="county-row"><div class="county-name">${c}</div><div style="flex:1;font-size:.78rem;color:var(--gray)">${cnt} leads · ${done} done</div><span class="badge badge-completed" style="font-size:.68rem">Active</span></div>`;}).join('')}
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-// ─── COVERAGE MAP INIT ──────────────────────────────────────────
-// Uses Maps Embed API (iframe) — works on all devices including iOS Safari.
-// The JS API approach fails on mobile inside position:fixed/overflow:auto containers.
-function initCoverageMap() {
-  const container = document.getElementById('coverage-map-container');
-  const alertEl   = document.getElementById('coverage-map-alert');
-  if (!container) return;
-
-  if (!settings.googleMapsKey) {
-    container.innerHTML = `
-      <div style="min-height:240px;height:100%;display:flex;align-items:center;justify-content:center;
-                  flex-direction:column;gap:12px;color:var(--gray);
-                  border:2px dashed var(--navy-border);border-radius:0 0 14px 14px;box-sizing:border-box;padding:20px">
-        <div style="font-size:2.5rem">🗺️</div>
-        <div style="font-weight:600;color:var(--white)">Coverage Map</div>
-        <div style="font-size:.82rem;text-align:center;max-width:280px;line-height:1.5">
-          Enter your Google Maps API key in
-          <span style="cursor:pointer;color:var(--blue-bright);text-decoration:underline"
-                onclick="navTo('settings')">Settings → Integrations</span>
-          to activate the interactive map
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px">
-          <span style="font-size:.75rem;background:rgba(37,99,235,.15);color:var(--blue-bright);padding:4px 12px;border-radius:20px;border:1px solid rgba(37,99,235,.3)">5 PA Counties</span>
-          <span style="font-size:.75rem;background:rgba(6,182,212,.12);color:var(--cyan);padding:4px 12px;border-radius:20px;border:1px solid rgba(6,182,212,.3)">3 NJ Counties</span>
-        </div>
-      </div>`;
-    if (alertEl) alertEl.innerHTML = `<div class="alert-box warn">⚠️ <div><strong>No Google Maps API key set.</strong> <span style="cursor:pointer;text-decoration:underline" onclick="navTo('settings')">Add it in Settings → Integrations</span> then return here. Enable <strong>Maps Embed API</strong> in Google Cloud Console.</div></div>`;
-    return;
-  }
-
-  if (alertEl) alertEl.innerHTML = `<div class="alert-box info">🗺️ <div>Showing 8-county PA/NJ service territory. If the map shows an error, enable <strong>Maps Embed API</strong> in your Google Cloud Console and ensure billing is active.</div></div>`;
-
-  // Build county marker pins for the embed URL
-  const markers = [
-    { lat:39.9526, lng:-75.1652, label:'PHL' },
-    { lat:40.2115, lng:-75.3874, label:'MON' },
-    { lat:40.3451, lng:-75.0619, label:'BUC' },
-    { lat:39.9735, lng:-75.7407, label:'CHE' },
-    { lat:39.9068, lng:-75.4093, label:'DEL' },
-    { lat:40.0110, lng:-74.7143, label:'BUR' },
-    { lat:39.8007, lng:-74.9636, label:'CAM' },
-    { lat:39.7090, lng:-75.1493, label:'GLO' },
-  ];
-  const markerParams = markers.map(m => `markers=color:blue%7Clabel:${m.label}%7C${m.lat},${m.lng}`).join('&');
-  const src = `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(settings.googleMapsKey)}&center=40.05,-75.15&zoom=9&maptype=roadmap`;
-
-  container.innerHTML = `
-    <iframe
-      src="${src}"
-      width="100%"
-      height="100%"
-      style="border:0;display:block;width:100%;height:100%;min-height:280px;border-radius:0 0 14px 14px"
-      allowfullscreen
-      loading="lazy"
-      referrerpolicy="no-referrer-when-downgrade"
-      title="ExpertEV Coverage Territory">
-    </iframe>`;
-}
 
 // ─── SMS TEMPLATES ──────────────────────────────────────────────
 function pgSmsTemplates() {
@@ -3239,10 +3144,10 @@ function pgDeploy() {
       code:'Formspree → Settings → Email Notifications\nEnter: your real email address' },
     { title:'5. Update Phone Numbers', desc:'In Settings → Business Info, replace the placeholder PA and NJ numbers with real numbers. You can use Google Voice (free) to get a local number that forwards to your cell. Having a real phone number on the site builds massive trust.',
       code:'PA line: Google Voice PA area code (215, 610, 267, 484)\nNJ line: Google Voice NJ area code (856, 609)', link:'https://voice.google.com', linkText:'Get Google Voice' },
-    { title:'6. Get Red Flow Partnership in Writing', desc:'Before using Red Flow Electric\'s name publicly, have a simple written agreement. Even a short email confirming they approve of you co-branding your lead-gen with their name is enough to protect both sides. Key points: their license #, approved counties, response time SLA.',
-      code:'Email template: "Confirming Red Flow Electric approves ExpertEV\nusing our name/license for EV charger lead generation\nin [COUNTIES]. Agreed lead response time: [X] hours."' },
-    { title:'7. Share & Get Your First Lead', desc:'Share your website link in: Facebook neighborhood groups, Nextdoor posts in your coverage counties, Red Flow\'s existing customer list (ask permission), your personal LinkedIn/Facebook. Your first 3 leads often come from your immediate network.',
-      code:'Top free channels:\n• Nextdoor (hyperlocal, high intent)\n• Facebook local groups\n• Google Business Profile (register free)\n• Red Flow Electric existing customers' },
+    { title:'6. Invite Your First Contractor', desc:'Go to the Contractors page and use the Invite Contractor form. Enter their name, email, and counties they serve. They will receive an email to set up their account and can log in to view their assigned leads.',
+      code:'Contractors → Invite Contractor\nEnter: name, email, license #, counties\nThey receive: setup email with login link' },
+    { title:'7. Share & Get Your First Lead', desc:'Share your website link in Facebook neighborhood groups, Nextdoor posts in your coverage counties, and your personal network. Your first 3 leads often come from your immediate community.',
+      code:'Top free channels:\n• Nextdoor (hyperlocal, high intent)\n• Facebook local groups\n• Google Business Profile (register free)\n• Your personal LinkedIn/Facebook' },
     { title:'8. Add Google Business Profile', desc:'Search "Google Business Profile" and create a free listing for Expert EV Installers. This gets you shown in local Google searches and maps. Use your real address or service-area-based listing. Add your website URL, phone number, and service area.',
       code:'business.google.com → Create Profile\nBusiness type: Electrical Contractor\nService areas: Your 8 counties', link:'https://business.google.com', linkText:'Open Google Business' },
   ];
@@ -3326,11 +3231,6 @@ function pgSettings() {
             <label class="form-label">Formspree Form ID <span style="color:var(--red)">*</span></label>
             <input class="form-input" id="s-formspree" value="${settings.formspreeId}" placeholder="e.g. xyzabcde">
             <div style="font-size:.75rem;color:var(--gray);margin-top:4px">Get this from <a href="https://formspree.io" target="_blank" style="color:var(--blue-bright)">formspree.io</a> → your form → Settings</div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Google Maps API Key</label>
-            <input class="form-input" id="s-gmap" value="${settings.googleMapsKey||''}" placeholder="AIzaSy...">
-            <div style="font-size:.75rem;color:var(--gray);margin-top:4px">For interactive coverage map. Optional — get from Google Cloud Console.</div>
           </div>
         </div>
         <div class="alert-box warn" style="margin-top:4px">⚠️ <div><strong>Formspree is required</strong> to receive leads from your website forms. Without it, form submissions are lost.</div></div>
@@ -3441,7 +3341,6 @@ function saveSettings() {
   settings.njPhone       = document.getElementById('s-njphone')?.value      || settings.njPhone;
   settings.adminSmsPhone = (document.getElementById('s-adminsmophone')?.value ?? '').trim();
   settings.formspreeId   = document.getElementById('s-formspree')?.value  || settings.formspreeId;
-  settings.googleMapsKey = (document.getElementById('s-gmap')?.value ?? '').trim();
   settings.commissionPct  = parseInt(document.getElementById('s-commission')?.value) || settings.commissionPct;
   settings.leadFee        = parseInt(document.getElementById('s-leadfee')?.value)    || settings.leadFee;
   const resendVal = (document.getElementById('s-resend')?.value ?? '').trim();
@@ -4872,7 +4771,7 @@ function openQualityReview(lid) {
     <div class="detail-row"><div class="detail-label">Lead Source</div><div class="detail-value">${l.leadSource||'Direct'}</div></div>
     <div class="detail-row"><div class="detail-label">Contacted?</div><div class="detail-value" style="color:${l.contactedAt?'var(--green)':'var(--red)'}">${l.contactedAt||'Not yet'}</div></div>
     <div class="form-group" style="margin-top:14px"><label class="form-label">Dispute / Admin Note</label>
-      <input class="form-input" id="qa-note" placeholder="e.g. Customer disputed install quality. Escalating to Red Flow."></div>
+      <input class="form-input" id="qa-note" placeholder="e.g. Customer disputed install quality. Escalating to assigned contractor."></div>
     <div class="form-group"><label class="form-label">Override Contractor Assignment</label>
       <select class="form-input" id="qa-contractor">
         <option value="">— Keep current —</option>

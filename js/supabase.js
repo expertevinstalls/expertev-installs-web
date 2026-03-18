@@ -731,7 +731,6 @@ function _settingsToRow(s) {
     auto_assign:      s.autoAssign     ?? false,
     follow_up_alerts: s.followUpAlerts ?? true,
     review_requests:  s.reviewRequests ?? false,
-    google_maps_key:  s.googleMapsKey  ?? '',
     checklist_done:   s.checklistDone  ?? {},
   };
 }
@@ -751,7 +750,6 @@ function _rowToSettings(row) {
     autoAssign:     row.auto_assign      ?? false,
     followUpAlerts: row.follow_up_alerts ?? true,
     reviewRequests: row.review_requests  ?? false,
-    googleMapsKey:  row.google_maps_key  ?? '',
     checklistDone:  row.checklist_done   ?? {},
   };
 }

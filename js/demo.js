@@ -48,7 +48,7 @@ let settings = {
 };
 
 let checklist = [
-  { id:'domain',    title:'Register your domain',            desc:'Buy expertevinstallers.com (or similar) on Namecheap or GoDaddy (~$12/yr). This is your brand URL.',           link:'https://www.namecheap.com', linkText:'Open Namecheap' },
+  { id:'domain',    title:'Register your domain',            desc:'Buy expertevinstalls.com (or similar) on Namecheap or GoDaddy (~$12/yr). This is your brand URL.',           link:'https://www.namecheap.com', linkText:'Open Namecheap' },
   { id:'netlify',   title:'Deploy website to Netlify',       desc:'Upload expertev-credibility-first.html and this dashboard.html to Netlify. Free plan works great to start.',   link:'https://app.netlify.com',  linkText:'Open Netlify' },
   { id:'formspree', title:'Connect Formspree for lead forms', desc:'Create a free Formspree account, get your form ID, and paste it into Settings → Integrations below.',         link:'https://formspree.io',     linkText:'Open Formspree' },
   { id:'email',     title:'Set up admin email alerts',        desc:'In Settings → Notifications, enter your real email so new leads hit your inbox instantly.',                    link:null },

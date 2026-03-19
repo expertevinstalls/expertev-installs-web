@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "source": "/philadelphia", "destination": "/index.html" },
+    { "source": "/montgomery",   "destination": "/index.html" },
+    { "source": "/bucks",        "destination": "/index.html" },
+    { "source": "/chester",      "destination": "/index.html" },
+    { "source": "/delaware",     "destination": "/index.html" },
+    { "source": "/burlington",   "destination": "/index.html" },
+    { "source": "/camden",       "destination": "/index.html" },
+    { "source": "/gloucester",   "destination": "/index.html" }
+  ]
+}

@@ -181,22 +181,45 @@ function showPage(id) {
   window.scrollTo({top:0,behavior:'instant'});
 }
 
-const _HOME_META = "Licensed EV charger installation across Philadelphia, South Jersey & 8 counties. Permitted installs, rebate guidance, same-week availability.";
+const _HOME_META  = "Licensed EV charger installation across Philadelphia, South Jersey & surrounding counties. Fast installs, panel upgrades, and Tesla charger setup.";
+const _HOME_TITLE = "EV Charger Installation in Philadelphia & South Jersey | Expert EV Installers";
+const _SITE_ORIGIN = "https://expertevinstalls.com";
 
 function _setMetaDesc(content) {
   const tag = document.querySelector('meta[name="description"]');
   if (tag) tag.setAttribute('content', content);
 }
 
-function goHome() { _setMetaDesc(_HOME_META); showPage('home'); }
+function _setCanonical(path) {
+  let tag = document.querySelector('link[rel="canonical"]');
+  if (!tag) { tag = document.createElement('link'); tag.rel = 'canonical'; document.head.appendChild(tag); }
+  tag.href = _SITE_ORIGIN + path;
+}
 
-function goCounty(id) {
+function goHome(pushState) {
+  _setMetaDesc(_HOME_META);
+  document.title = _HOME_TITLE;
+  _setCanonical('/');
+  if (pushState !== false) history.pushState({}, '', '/');
+  showPage('home');
+}
+
+function goCounty(id, pushState) {
   const c = CD[id];
   if (!c) return;
   if (c.metaDesc) _setMetaDesc(c.metaDesc);
+  document.title = `EV Charger Installation ${c.name} | Expert EV Installers`;
+  _setCanonical('/' + id);
+  if (pushState !== false) history.pushState({county: id}, '', '/' + id);
   buildCounty(c, id);
   showPage('county');
 }
+
+window.addEventListener('popstate', function() {
+  const slug = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  if (slug && CD[slug]) { goCounty(slug, false); }
+  else { goHome(false); }
+});
 
 /* ============================================================
    COUNTY PAGE BUILDER
@@ -3134,8 +3157,8 @@ function copySms(i) {
 // ─── LAUNCH GUIDE ───────────────────────────────────────────────
 function pgDeploy() {
   const steps = [
-    { title:'1. Register Your Domain', desc:'Go to Namecheap.com and register expertevinstallers.com (~$12/yr). If taken, try expertevpa.com or expertevnj.com. This is your brand URL — it matters.',
-      code:'Recommended: Namecheap · GoDaddy · Google Domains\nTarget domain: expertevinstallers.com', link:'https://www.namecheap.com', linkText:'Open Namecheap' },
+    { title:'1. Register Your Domain', desc:'Go to Namecheap.com and register expertevinstalls.com (~$12/yr). If taken, try expertevpa.com or expertevnj.com. This is your brand URL — it matters.',
+      code:'Recommended: Namecheap · GoDaddy · Google Domains\nTarget domain: expertevinstalls.com', link:'https://www.namecheap.com', linkText:'Open Namecheap' },
     { title:'2. Deploy to Netlify (Free)', desc:'Sign up at netlify.com with your email. Drag and drop both HTML files (website + dashboard) into the deploy box. Netlify gives you a free HTTPS URL instantly. Then connect your domain in Site Settings → Domain Management.',
       code:'netlify.com → New site → Drag & drop files\nFiles to upload: expertev-credibility-first.html, expertev-dashboard.html', link:'https://app.netlify.com', linkText:'Open Netlify' },
     { title:'3. Connect Formspree (Free Lead Capture)', desc:'Go to formspree.io → New Form. Copy your form ID (looks like "xyzabcde"). Paste it into Settings → Integrations in this dashboard. Then update the website HTML: find action="https://formspree.io/f/YOUR_ID" and replace YOUR_ID with your real form ID.',
@@ -4891,5 +4914,15 @@ document.addEventListener('keydown', e => {
     if (overlay && overlay.classList.contains('open')) closeDashboardOverlay();
   }
 });
+
+/* ── Startup router — handle direct URL visits and browser refresh ──
+   Runs once on page load. If the URL path matches a county slug,
+   auto-navigate to that county page without pushing a new history entry. */
+(function _startupRouter() {
+  const slug = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  if (slug && CD[slug]) {
+    goCounty(slug, false);
+  }
+}());
 
 

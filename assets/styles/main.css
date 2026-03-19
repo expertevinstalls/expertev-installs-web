@@ -1118,52 +1118,135 @@ body::before {
 
 .expect-content p { font-size: 0.84rem; color: var(--steel); line-height: 1.68; }
 
-/* ===== BE FIRST ===== */
-.be-first {
-  background: linear-gradient(135deg, rgba(25,184,240,0.06), rgba(244,124,32,0.03));
-  border: 1px solid var(--border);
-  padding: 56px 48px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 48px;
-  align-items: center;
-  border-radius: 8px;
+/* ===== GOOGLE REVIEWS ===== */
+.reviews-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  margin-bottom: 36px;
+  flex-wrap: wrap;
 }
-
-.be-first-heading {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  line-height: 1.1;
-  margin-bottom: 14px;
-  color: var(--white);
-}
-
-.be-first-heading span { color: var(--cyan); }
-.be-first p { font-size: 0.9rem; color: var(--steel); line-height: 1.72; max-width: 480px; }
-.be-first-right { text-align: center; flex-shrink: 0; }
-
-.review-placeholder {
-  width: 180px;
-  height: 130px;
-  border: 2px dashed rgba(25,184,240,0.25);
+.reviews-cta-group {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+.reviews-write-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--cyan);
+  color: var(--bg);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.06em;
+  padding: 12px 22px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+.reviews-write-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.reviews-read-link {
+  font-size: 0.78rem;
+  color: var(--steel);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.reviews-read-link:hover { color: var(--cyan); }
+
+.reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.review-card {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+.review-card:hover { border-color: rgba(25,184,240,0.2); }
+.review-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.review-card-stars { font-size: 0.92rem; letter-spacing: 1px; }
+.review-card-google { opacity: 0.5; flex-shrink: 0; }
+.review-card-text {
+  font-size: 0.86rem;
+  color: var(--silver);
+  line-height: 1.7;
+  flex: 1;
+}
+.review-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border2);
+  padding-top: 12px;
+}
+.review-card-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(25,184,240,0.10);
+  border: 1px solid rgba(25,184,240,0.18);
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: var(--mid-grey);
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--cyan);
+  flex-shrink: 0;
+  font-family: 'Rajdhani', sans-serif;
+}
+.review-card-name {
+  font-size: 0.81rem;
   font-weight: 600;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  line-height: 1.2;
+}
+.review-card-date { font-size: 0.71rem; color: var(--steel); }
+
+.reviews-empty {
+  text-align: center;
+  padding: 60px 24px;
+  border: 1px dashed rgba(25,184,240,0.2);
+  border-radius: 12px;
+  background: rgba(25,184,240,0.02);
+}
+.reviews-empty-stars {
+  font-size: 1.5rem;
+  color: #f59e0b;
+  letter-spacing: 4px;
+  margin-bottom: 16px;
+  opacity: 0.65;
+}
+.reviews-empty-msg {
+  font-size: 0.9rem;
+  color: var(--steel);
+  line-height: 1.72;
 }
 
-.review-placeholder span { font-size: 1.8rem; }
+@media (max-width: 900px) {
+  .reviews-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 580px) {
+  .reviews-header { flex-direction: column; }
+  .reviews-cta-group { align-items: flex-start; padding-top: 0; }
+  .reviews-grid { grid-template-columns: 1fr; }
+}
 
 /* ===== COUNTIES GRID ===== */
 .county-grid {

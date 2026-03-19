@@ -4,7 +4,8 @@
 const CD = {
   philadelphia: {
     name:"Philadelphia County", state:"PA", isNJ:false,
-    metaDesc:"EV charger installation in Philadelphia, PA. Licensed electricians, permits handled, fast installs, and rebate guidance available.",
+    pageTitle:"EV Charger Installation in Philadelphia, PA | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation across Philadelphia, PA. L&I permits filed, panel upgrades available, free site assessments, and same-week installs.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Philadelphia, PA",
     desc:`<strong>Licensed Philadelphia electricians</strong> installing Level 2 EV chargers across all 48 neighborhoods — from Center City to Northeast Philly, South Philly to Chestnut Hill. Every installation is permitted through Philadelphia L&I and warrantied for 1 year.`,
@@ -25,7 +26,8 @@ const CD = {
   },
   montgomery: {
     name:"Montgomery County", state:"PA", isNJ:false,
-    metaDesc:"EV charger installation in Montgomery County, PA. Licensed electricians, all 62 municipal permits handled, and federal tax credit guidance.",
+    pageTitle:"EV Charger Installation in Montgomery County, PA | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation in Montgomery County, PA. Township permits handled countywide, panel assessments included, and federal tax credit guidance.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Montgomery County, PA",
     desc:`Serving all of Montgomery County — <strong>King of Prussia, Norristown, Blue Bell, Lansdale, Horsham</strong>, and every township in between. Our electricians know Montgomery County's permit landscape across all 62 municipalities.`,
@@ -46,7 +48,8 @@ const CD = {
   },
   bucks: {
     name:"Bucks County", state:"PA", isNJ:false,
-    metaDesc:"EV charger installation in Bucks County, PA. PA-licensed electricians serving Doylestown, Newtown, and beyond. Permits and rebate guidance included.",
+    pageTitle:"EV Charger Installation in Bucks County, PA | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation in Bucks County, PA — Doylestown, Newtown, and beyond. Rural properties, detached garages, and panel upgrades all welcome.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Bucks County, PA",
     desc:`Expert EV charger installation throughout Bucks County. From <strong>Doylestown and New Hope to Newtown and Bensalem</strong>, we serve every borough and township — including rural properties with detached garages requiring longer conduit runs.`,
@@ -67,7 +70,8 @@ const CD = {
   },
   chester: {
     name:"Chester County", state:"PA", isNJ:false,
-    metaDesc:"EV charger installation in Chester County, PA. Licensed electricians, permits pulled, panel assessments, and federal tax credit documentation.",
+    pageTitle:"EV Charger Installation in Chester County, PA | Expert EV Installers",
+    metaDesc:"EV charger installation in Chester County, PA. West Chester, Malvern, Exton — free panel assessments, township permits handled, and Tesla charger setup.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Chester County, PA",
     desc:`Chester County homeowners — we specialize in both straightforward garage installs and complex projects requiring panel upgrades. <strong>West Chester, Malvern, Exton, and Phoenixville</strong> are among our most active areas.`,
@@ -88,7 +92,8 @@ const CD = {
   },
   delaware: {
     name:"Delaware County", state:"PA", isNJ:false,
-    metaDesc:"EV charger installation in Delaware County, PA. Specialists in older-home panel upgrades. Permits, fast scheduling, and rebate guidance included.",
+    pageTitle:"EV Charger Installation in Delaware County, PA | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation in Delaware County, PA. Panel upgrade specialists for older Delco homes — Media, Havertown, Upper Darby. Free site assessment.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Delaware County, PA",
     desc:`Serving Delaware County from <strong>Media and Havertown to Upper Darby and Swarthmore</strong>. Delco's dense suburban landscape and older housing stock means many homes need panel evaluation before installation — our free assessment catches issues upfront.`,
@@ -109,7 +114,8 @@ const CD = {
   },
   burlington: {
     name:"Burlington County", state:"NJ", isNJ:true,
-    metaDesc:"EV charger installation in Burlington County, NJ. NJ-licensed electricians, permits handled, PSE&G make-ready incentive guidance, and fast scheduling.",
+    pageTitle:"EV Charger Installation in Burlington County, NJ | Expert EV Installers",
+    metaDesc:"NJ-licensed EV charger installation in Burlington County — Mount Laurel, Moorestown, Marlton. PSE&G incentives, all NJ permits handled, same-week availability.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Burlington County, NJ",
     desc:`Burlington County NJ homeowners — <strong>NJ-licensed electricians</strong> installing Level 2 EV chargers across Moorestown, Mt. Laurel, Marlton, and all surrounding towns. NJ permits, PSE&G make-ready incentive guidance, and federal tax credit documentation handled for you.`,
@@ -130,7 +136,8 @@ const CD = {
   },
   camden: {
     name:"Camden County", state:"NJ", isNJ:true,
-    metaDesc:"EV charger installation in Camden County, NJ. NJ-licensed electricians, permits handled, PSE&G incentive guidance, and same-week scheduling available.",
+    pageTitle:"EV Charger Installation in Camden County, NJ | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation in Camden County, NJ — Cherry Hill, Voorhees, Haddonfield. NJ permits handled, PSE&G make-ready incentives, same-week scheduling.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Camden County, NJ",
     desc:`Expert EV charger installation across Camden County NJ — <strong>Cherry Hill, Voorhees, Haddonfield</strong>, and all surrounding towns. NJ-licensed electricians who pass inspections the first time and help you navigate available PSE&G make-ready incentives.`,
@@ -151,7 +158,8 @@ const CD = {
   },
   gloucester: {
     name:"Gloucester County", state:"NJ", isNJ:true,
-    metaDesc:"EV charger installation in Gloucester County, NJ. NJ-licensed electricians, permits handled, PSE&G make-ready guidance, and fast same-week installs.",
+    pageTitle:"EV Charger Installation in Gloucester County, NJ | Expert EV Installers",
+    metaDesc:"Licensed EV charger installation in Gloucester County, NJ — Woodbury, Washington Township, Glassboro. NJ permits handled and PSE&G make-ready incentives available.",
     phone:WEBSITE_PHONE.display, tel:WEBSITE_PHONE.tel,
     h1a:"EV Charger", h1b:"Installation", h1c:"Gloucester County, NJ",
     desc:`Serving Gloucester County NJ homeowners across <strong>Woodbury, Washington Township, Glassboro, and Sewell</strong>. Professional Level 2 EV charger installations with full NJ licensing, permits, and PSE&G make-ready incentive guidance.`,
@@ -208,7 +216,7 @@ function goCounty(id, pushState) {
   const c = CD[id];
   if (!c) return;
   if (c.metaDesc) _setMetaDesc(c.metaDesc);
-  document.title = `EV Charger Installation ${c.name} | Expert EV Installers`;
+  document.title = c.pageTitle || `EV Charger Installation ${c.name} | Expert EV Installers`;
   _setCanonical('/' + id);
   if (pushState !== false) history.pushState({county: id}, '', '/' + id);
   buildCounty(c, id);

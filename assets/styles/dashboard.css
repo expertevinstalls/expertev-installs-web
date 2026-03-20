@@ -585,3 +585,20 @@
 @media (max-width: 600px) {
   #page-my-profile .card .form-row { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   LEAD SCORING PANEL STYLES
+   Used in the Lead Score tab inside openLeadDetail modal.
+============================================================ */
+
+/* Grade badge variants (also used inline, but usable as classes) */
+.score-badge-standard { color:#4A6FA5; background:rgba(74,111,165,0.15); border:1px solid rgba(74,111,165,0.35); }
+.score-badge-verified  { color:#19B8F0; background:rgba(25,184,240,0.15); border:1px solid rgba(25,184,240,0.35); }
+.score-badge-premium   { color:#F47C20; background:rgba(244,124,32,0.15); border:1px solid rgba(244,124,32,0.35); }
+.score-badge-exclusive { color:#2ECC71; background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.35); }
+
+/* Grade + Fee column in All Leads table — keeps column width tight */
+.leads-table th:nth-child(6),
+.leads-table td:nth-child(6) { white-space: nowrap; }
+.leads-table th:nth-child(7),
+.leads-table td:nth-child(7) { white-space: nowrap; min-width: 52px; }

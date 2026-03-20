@@ -768,7 +768,8 @@ async function _submitFormInner(fieldsId, successId) {
     // Part A new fields
     homeType:        sanitizeHTML(vals['home_type']      || ''),
     panelLocation:   sanitizeHTML(vals['panel_location'] || ''),
-    openBreaker:     sanitizeHTML(vals['open_breaker']   || ''),
+    openBreaker:          sanitizeHTML(vals['open_breaker']          || ''),
+    installationTimeline: sanitizeHTML(vals['installation_timeline'] || ''),
     // Part B response timer
     assignedAt:      assignedId ? new Date().toISOString() : null,
     responseDeadline: assignedId ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null,
@@ -780,6 +781,8 @@ async function _submitFormInner(fieldsId, successId) {
   lead.installTime     = ji.timeLabel;
   lead.profitPotential = ji.profit;
   lead.difficulty      = ji.difficulty;
+  // Attach lead scoring (lead-scoring.js)
+  lead.scoring = resolveLead(lead, false);
 
   console.log('[FORM] Lead object ready — saving to localStorage and Supabase');
 
@@ -1959,7 +1962,7 @@ function renderLeadsTable() {
   } else {
     wrap.innerHTML = `<table class="leads-table"><thead><tr>
         <th style="width:32px;padding:8px 4px 8px 12px"><input type="checkbox" id="select-all-cb" onchange="_onSelectAll(this.checked)" style="cursor:pointer;accent-color:#2563eb" title="Select all visible"></th>
-        <th>ID</th><th>Customer</th><th>County</th><th>Description</th><th>Complexity</th><th>Value</th><th>Contractor</th><th>Status</th><th>Date</th><th></th>
+        <th>ID</th><th>Customer</th><th>County</th><th>Description</th><th>Complexity</th><th>Grade</th><th>Fee</th><th>Value</th><th>Contractor</th><th>Status</th><th>Date</th><th></th>
       </tr></thead><tbody>
       ${filtered.map(l=>{ const cn=l.notes.find(n=>n.author==='Customer'); return `<tr class="${selectedLeadIds.has(l.id)?'row-selected':''}">
         <td style="padding:8px 4px 8px 12px"><input type="checkbox" class="lead-cb" data-id="${l.id}" onchange="_onLeadCbChange('${l.id}',this.checked)" ${selectedLeadIds.has(l.id)?'checked':''} style="cursor:pointer;accent-color:#2563eb"></td>
@@ -1968,6 +1971,8 @@ function renderLeadsTable() {
         <td>${l.county},${l.state}</td>
         <td style="font-size:.78rem;color:var(--gray);max-width:180px">${cn?`<span title="${sanitizeHTML(cn.text)}">${sanitizeHTML(cn.text.length>70?cn.text.slice(0,70)+'…':cn.text)}</span>`:l.service}</td>
         <td style="font-size:.78rem">${l.complexity||'—'}</td>
+        <td>${l.scoring ? _scoreGradeBadge(l.scoring.grade_override||l.scoring.grade) : '<span style="color:var(--gray);font-size:.75rem">—</span>'}</td>
+        <td style="font-size:.82rem;font-weight:700;color:#19B8F0">${l.scoring ? `$${l.scoring.price_usd}` : '—'}</td>
         <td style="min-width:80px">${_priceTag(l)}</td>
         <td style="font-size:.82rem">${cName(l.contractor)}</td>
         <td><span class="badge badge-${l.status}">${cap(l.status)}</span></td>
@@ -3718,6 +3723,7 @@ function openLeadDetail(id) {
       <button class="tab-btn" onclick="switchTab(event,'tab-notes')">Notes (${l.notes.length})</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-activity');_loadActivity('${l.id}')">Activity</button>
       <button class="tab-btn" onclick="switchTab(event,'tab-actions')">✏️ Edit Lead</button>
+      ${currentUser?.role==='admin' ? `<button class="tab-btn" onclick="switchTab(event,'tab-score');_initScoringPanel('${l.id}')">🎯 Lead Score</button>` : ''}
     </div>
     <div class="tab-panel active" id="tab-intel">
       <!-- Profit potential banner -->
@@ -3926,7 +3932,8 @@ function openLeadDetail(id) {
         </div>
       </div>
       <button class="btn btn-outline btn-sm" style="margin-bottom:4px" onclick="_saveInlineQuote('${l.id}')">💾 Save Quote Amount</button>` : ''}
-    </div>`;
+    </div>
+    ${currentUser?.role==='admin' ? `<div class="tab-panel" id="tab-score">${_renderScoringPanel(l)}</div>` : ''}`;
   document.getElementById('modal-footer').innerHTML = `
     ${currentUser?.role==='admin'?`<button class="btn btn-outline" onclick="deleteLead('${l.id}')" style="color:var(--red);border-color:rgba(239,68,68,.4);margin-right:auto">🗑 Delete</button>`:''}
     <button class="btn btn-outline" onclick="closeModalDirect()">Close</button>
@@ -4932,5 +4939,264 @@ document.addEventListener('keydown', e => {
     goCounty(slug, false);
   }
 }());
+
+/* ============================================================
+   LEAD SCORING UI HELPERS
+   Added as additive-only block. No existing functions modified.
+   Requires lead-scoring.js loaded before app.js.
+============================================================ */
+
+/* ── Grade badge HTML ──────────────────────────────────────── */
+function _scoreGradeBadge(grade) {
+  const cfg = {
+    standard: { color: '#4A6FA5', bg: 'rgba(74,111,165,0.15)', label: 'STANDARD' },
+    verified: { color: '#19B8F0', bg: 'rgba(25,184,240,0.15)', label: 'VERIFIED' },
+    premium:  { color: '#F47C20', bg: 'rgba(244,124,32,0.15)', label: 'PREMIUM'  },
+  };
+  const c = cfg[grade] || cfg.standard;
+  return `<span style="font-size:.68rem;font-weight:700;letter-spacing:.08em;color:${c.color};background:${c.bg};border:1px solid ${c.color}40;border-radius:4px;padding:2px 7px">${c.label}</span>`;
+}
+
+/* ── Scoring panel renderer ─────────────────────────────────── */
+function _renderScoringPanel(lead) {
+  // Lazy-init scoring on old leads that don't have it yet
+  if (!lead.scoring) {
+    lead.scoring = resolveLead(lead, false);
+    persist();
+  }
+  const sc       = lead.scoring;
+  const grade    = sc.grade_override || sc.grade;
+  const isExcl   = sc.is_exclusive || false;
+  const priceUsd = isExcl ? getLeadPrice(sc.job_type, grade, true) : getLeadPrice(sc.job_type, grade, false);
+  const priceKey = getPriceId(sc.job_type, grade, isExcl);
+
+  const gradeColors = {
+    standard: { color: '#4A6FA5', bar: '#4A6FA5' },
+    verified: { color: '#19B8F0', bar: '#19B8F0' },
+    premium:  { color: '#F47C20', bar: '#F47C20' },
+  };
+  const gc = gradeColors[grade] || gradeColors.standard;
+
+  const jobTypeLabels = { residential: 'Residential', panel_upgrade: 'Panel Upgrade', commercial: 'Commercial' };
+  const jobLabel = jobTypeLabels[sc.job_type] || sc.job_type;
+
+  // Breakdown rows
+  const bRows = Object.entries(sc.breakdown).map(([key, dim]) => {
+    const pct = dim.max > 0 ? Math.round((dim.score / dim.max) * 100) : 0;
+    const dimColor = dim.score === 0 ? 'rgba(100,116,139,0.5)' : dim.score === dim.max ? '#19B8F0' : '#F47C20';
+    return `
+    <div style="display:grid;grid-template-columns:110px 1fr 50px;gap:8px;align-items:center;padding:5px 0;${dim.score===0?'opacity:.45':''}">
+      <div style="font-size:.72rem;color:var(--gray);font-weight:600">${dim.label}</div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${dimColor};border-radius:4px;transition:width .3s"></div>
+      </div>
+      <div style="font-size:.72rem;font-weight:700;color:${dimColor};text-align:right">${dim.score}/${dim.max}</div>
+    </div>`;
+  }).join('');
+
+  // Signals
+  const sigHtml = sc.signals.length > 0
+    ? sc.signals.map(s => `<div style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--silver);padding:3px 0"><span style="color:#19B8F0;font-size:.6rem">●</span>${s}</div>`).join('')
+    : `<div style="font-size:.78rem;color:var(--gray)">No confirmed signals yet</div>`;
+
+  // Contractor lead card preview
+  const activeSignals   = sc.signals;
+  const inactiveSignals = [];
+  const allPossible = ['EV owner confirmed','Charger already purchased','Panel pre-verified (200A + open slots)','Short wire run (<25 ft)','Ready to book within 2 weeks','PSE&G incentive eligible (NJ)'];
+  allPossible.forEach(s => { if (!activeSignals.includes(s)) inactiveSignals.push(s); });
+
+  const cardPreview = `
+  <div style="background:rgba(10,37,64,0.8);border:1px solid rgba(25,184,240,0.3);border-radius:12px;padding:16px 18px;margin-top:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--gray);margin-bottom:3px">Job Type</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--white)">${jobLabel}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${_scoreGradeBadge(grade)}
+        ${isExcl ? `<span style="font-size:.68rem;font-weight:700;letter-spacing:.08em;color:#2ECC71;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.35);border-radius:4px;padding:2px 7px">EXCLUSIVE</span>` : ''}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      ${activeSignals.map(s=>`<span style="font-size:.65rem;background:rgba(25,184,240,0.1);color:#19B8F0;border:1px solid rgba(25,184,240,0.25);border-radius:10px;padding:2px 8px">● ${s}</span>`).join('')}
+      ${inactiveSignals.map(s=>`<span style="font-size:.65rem;background:rgba(255,255,255,0.03);color:rgba(100,116,139,0.6);border:1px solid rgba(100,116,139,0.15);border-radius:10px;padding:2px 8px">○ ${s}</span>`).join('')}
+    </div>
+    <div style="font-size:.7rem;color:var(--gray)">Lead fee paid: <strong style="color:#19B8F0">$${priceUsd}</strong> · Key: <span style="font-family:'Share Tech Mono',monospace;color:var(--silver)">${priceKey}</span></div>
+  </div>`;
+
+  return `
+  <div style="padding:4px 0">
+
+    <!-- Score meter -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px 18px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:4px">Score</div>
+          <div style="font-size:1.8rem;font-weight:800;color:${gc.color};line-height:1">${sc.score} <span style="font-size:1rem;color:var(--gray);font-weight:400">/ 16</span></div>
+        </div>
+        <div style="text-align:center">
+          ${_scoreGradeBadge(grade)}
+          ${sc.grade_override ? `<div style="font-size:.62rem;color:#F47C20;margin-top:4px">Manual Override</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:4px">Scored</div>
+          <div style="font-size:.75rem;color:var(--silver)">${sc.scored_at ? new Date(sc.scored_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.06);border-radius:6px;height:8px;overflow:hidden">
+        <div style="height:100%;width:${sc.score_percent}%;background:${gc.bar};border-radius:6px;transition:width .5s"></div>
+      </div>
+    </div>
+
+    <!-- Breakdown grid -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;margin-bottom:14px">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:10px">Score Breakdown</div>
+      ${bRows}
+    </div>
+
+    <!-- Two-column: Job type + Lead fee -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <!-- Job type + override -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 16px">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:8px">Job Type</div>
+        <div style="font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:10px">${jobLabel}</div>
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:6px">Override Grade</div>
+        <select id="score-grade-override" class="form-input" style="font-size:.8rem;padding:6px 10px" onchange="_saveLeadScoring('${lead.id}',{grade_override:this.value||null})">
+          <option value="">Auto (${sc.grade})</option>
+          <option value="standard" ${sc.grade_override==='standard'?'selected':''}>Standard</option>
+          <option value="verified"  ${sc.grade_override==='verified'?'selected':''}>Verified</option>
+          <option value="premium"   ${sc.grade_override==='premium'?'selected':''}>Premium</option>
+        </select>
+      </div>
+      <!-- Lead fee card -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 16px">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:4px">Lead Fee</div>
+        <div style="font-size:1.8rem;font-weight:800;color:#19B8F0;line-height:1;margin-bottom:8px">$${priceUsd}</div>
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:4px">Exclusive Routing</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem;color:var(--silver)">
+          <input type="checkbox" id="score-exclusive-toggle" ${isExcl?'checked':''} style="cursor:pointer;accent-color:#2ECC71;width:16px;height:16px"
+            onchange="_saveLeadScoring('${lead.id}',{is_exclusive:this.checked})">
+          ${isExcl ? '<span style="color:#2ECC71;font-weight:700">Exclusive (2×)</span>' : 'Standard Routing'}
+        </label>
+        <div style="margin-top:10px">
+          <div style="font-size:.62rem;color:var(--gray);font-family:\'Share Tech Mono\',monospace;word-break:break-all;margin-bottom:4px">${priceKey}</div>
+          <button class="btn btn-outline btn-sm" style="font-size:.72rem;padding:4px 10px" onclick="navigator.clipboard.writeText('${priceKey}').then(()=>showToast('Price key copied'))">Copy Key</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signals -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;margin-bottom:14px">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:8px">Confirmed Signals</div>
+      ${sigHtml}
+    </div>
+
+    <!-- Contractor lead card preview -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray)">Contractor Lead Card Preview</div>
+        <button class="btn btn-outline btn-sm" style="font-size:.72rem;padding:4px 10px"
+          onclick="_copyLeadCard('${lead.id}')">Copy Lead Card</button>
+      </div>
+      ${cardPreview}
+    </div>
+
+    <!-- Routing controls -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 18px">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gray);margin-bottom:10px">Routing Controls</div>
+      ${lead.routing && lead.routing.status === 'routed'
+        ? `<div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.3);border-radius:8px;padding:10px 14px;margin-bottom:10px">
+             <span style="font-size:.72rem;font-weight:700;color:#2ECC71">✓ Routed</span>
+             <span style="font-size:.78rem;color:var(--silver);margin-left:8px">→ ${sanitizeHTML(lead.routing.contractor_name||'Unknown')} on ${lead.routing.routed_at ? new Date(lead.routing.routed_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</span>
+           </div>
+           <div style="font-size:.75rem;color:#fbbf24;margin-bottom:8px">⚠ Lead already routed — re-routing will update the record.</div>`
+        : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:160px">
+          <label style="font-size:.7rem;color:var(--gray);display:block;margin-bottom:4px">Assign to Contractor</label>
+          <select id="score-route-contractor" class="form-input" style="font-size:.82rem;padding:7px 10px">
+            <option value="">Select contractor…</option>
+            ${(_getContractors()||[]).map(c=>`<option value="${c.id}" ${lead.routing?.contractor_id===c.id?'selected':''}>${sanitizeHTML(c.companyName||c.name)}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="_saveLeadRouting('${lead.id}')">Mark as Routed</button>
+      </div>
+    </div>
+
+  </div>`;
+}
+
+/* ── Init scoring panel (called on tab click) ────────────────── */
+function _initScoringPanel(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  // Lazy-score if missing (older lead without scoring property)
+  if (!l.scoring) {
+    l.scoring = resolveLead(l, false);
+    persist();
+    // Re-render the panel with fresh data
+    const panel = document.getElementById('tab-score');
+    if (panel) panel.innerHTML = _renderScoringPanel(l);
+  }
+}
+
+/* ── Save scoring overrides ─────────────────────────────────── */
+function _saveLeadScoring(leadId, updates) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  if (!l.scoring) l.scoring = resolveLead(l, false);
+  // Apply updates (grade_override and/or is_exclusive)
+  if ('grade_override' in updates) l.scoring.grade_override = updates.grade_override || null;
+  if ('is_exclusive'   in updates) l.scoring.is_exclusive   = updates.is_exclusive;
+  // Re-resolve price with current state
+  const effGrade = l.scoring.grade_override || l.scoring.grade;
+  l.scoring.price_usd = getLeadPrice(l.scoring.job_type, effGrade, l.scoring.is_exclusive);
+  l.scoring.price_id  = getPriceId(l.scoring.job_type, effGrade, l.scoring.is_exclusive);
+  l.scoring.price_key = l.scoring.price_id;
+  persist();
+  // Re-render scoring panel in place
+  const panel = document.getElementById('tab-score');
+  if (panel) panel.innerHTML = _renderScoringPanel(l);
+  showToast('Scoring updated');
+}
+
+/* ── Save routing ───────────────────────────────────────────── */
+function _saveLeadRouting(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l) return;
+  const cId  = document.getElementById('score-route-contractor')?.value;
+  const cRec = cId ? (_getContractors()||[]).find(c => c.id === cId) : null;
+  if (!cRec) { showToast('Select a contractor first'); return; }
+  if (!l.routing) l.routing = {};
+  l.routing.status          = 'routed';
+  l.routing.contractor_id   = cId;
+  l.routing.contractor_name = cRec.companyName || cRec.name;
+  l.routing.routed_at       = new Date().toISOString();
+  persist();
+  // Re-render scoring panel in place
+  const panel = document.getElementById('tab-score');
+  if (panel) panel.innerHTML = _renderScoringPanel(l);
+  showToast(`Lead routed to ${sanitizeHTML(l.routing.contractor_name)}`);
+}
+
+/* ── Copy lead card as plain text ───────────────────────────── */
+function _copyLeadCard(leadId) {
+  const l = leads.find(x => x.id === leadId);
+  if (!l || !l.scoring) return;
+  const sc      = l.scoring;
+  const grade   = sc.grade_override || sc.grade;
+  const priceUsd = getLeadPrice(sc.job_type, grade, sc.is_exclusive);
+  const lines = [
+    `Lead Card — ${l.id}`,
+    `Job Type: ${sc.job_type.replace('_', ' ').toUpperCase()}`,
+    `Grade: ${grade.toUpperCase()}${sc.is_exclusive ? ' (EXCLUSIVE)' : ''}`,
+    `Lead Fee: $${priceUsd}`,
+    `Score: ${sc.score}/16 (${sc.score_percent}%)`,
+    `Signals: ${sc.signals.join(' · ') || 'none'}`,
+    `Location: ${l.county}, ${l.state}`,
+    `Timeline: ${l.installationTimeline || 'Not specified'}`,
+  ];
+  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Lead card copied'));
+}
 
 

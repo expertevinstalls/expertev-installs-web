@@ -56,16 +56,16 @@ SELECT cron.schedule(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/send-monthly-report',
     headers := jsonb_build_object(
                  'Content-Type',  'application/json',
-                 'Authorization', 'Bearer <SERVICE_ROLE_KEY>',
-                 'apikey',        '<SERVICE_ROLE_KEY>'
+                 'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2anloZ2phZ3N6Z3Zrd3lmaWV1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzM2ODU5NCwiZXhwIjoyMDg4OTQ0NTk0fQ.GjQyn09J4-s7AmIhfEk6rwA306NkNtLCzwKDpatHEZs',
+                 'apikey',        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2anloZ2phZ3N6Z3Zrd3lmaWV1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzM2ODU5NCwiZXhwIjoyMDg4OTQ0NTk0fQ.GjQyn09J4-s7AmIhfEk6rwA306NkNtLCzwKDpatHEZs'
                ),
     body    := jsonb_build_object(
                  'period',        'last-month',
                  'periodLabel',   to_char(now() - interval '1 month', 'Month YYYY'),
-                 'recipient',     '<RECIPIENT_EMAIL>',
-                 'adminEmail',    '<ADMIN_EMAIL>',
+                 'recipient',     'expertevinstalls@gmail.com,
+                 'adminEmail',    'expertevinstalls@gmail.com',
                  'businessName',  'ExpertEV Installers',
-                 'resendApiKey',  '<RESEND_API_KEY>',
+                 'resendApiKey',  're_Epvn4W4s_3hkSHLi1KPJtyxSgEcyVLtg1',
                  'stats',         jsonb_build_object(
                                     'newLeads',     0,
                                     'completed',    0,

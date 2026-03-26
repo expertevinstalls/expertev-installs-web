@@ -34,8 +34,8 @@ let selectedLeadIds = new Set();
 let settings = {
   formspreeId: 'xykneqwo',
   adminEmail: 'expertevinstalls@gmail.com',
-  paPhone: '(267) 435-2592',
-  njPhone: '(267) 435-2592',
+  paPhone: '(267) 456-8134',
+  njPhone: '(267) 456-8134',
   adminSmsPhone: '',
   leadFee: 75,
   commissionPct: 15,
